@@ -9,7 +9,8 @@
       "database.rules.json",
       "**/.*",
       "**/.git/**",
-      "**/* 2.*"
+      "**/* 2.*",
+      "README.md"
     ],
     "headers": [
       {

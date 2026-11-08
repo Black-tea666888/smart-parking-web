@@ -24,3 +24,8 @@ firebase deploy --only hosting
 ```
 
 `database.rules.json` is kept out of this public repository because it contains the owner's email.
+
+### Automatic deploy
+
+Every push to `main` deploys the site through GitHub Actions (`.github/workflows/deploy.yml`) and shows up under **Deployments**.
+It needs the repository secret `FIREBASE_SERVICE_ACCOUNT_SMART_PARKING_8DF51`; until that secret exists the workflow only prints a warning.
