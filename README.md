@@ -1,8 +1,7 @@
 <h1 align="center">Smart Parking Spot Detection</h1>
 
 <p align="center">
-  Real-time parking availability from light + weight sensors, shown on three web front ends.<br>
-  <b>Team D16</b> · NUTC Computer Science &amp; Information Engineering · Capstone Project
+  Real-time parking availability from light + weight sensors, shown on three web front ends.
 </p>
 
 <p align="center">
@@ -82,7 +81,7 @@ Two ESP32 boards (indoor and outdoor) push spot status to **Firebase Realtime Da
 - **Expiry date** for each grant, after which access ends automatically
 - **Revoke** any grant instantly; the person is signed out of the admin site
 
-> The recordings use demo data and placeholder accounts (`@d16.tw`).
+> The recordings use demo data and placeholder accounts.
 
 ---
 
@@ -150,12 +149,3 @@ Every push to `main` also deploys through GitHub Actions (`.github/workflows/dep
 It needs the repository secret `FIREBASE_SERVICE_ACCOUNT_SMART_PARKING_8DF51` (created by `firebase init hosting:github`); without it the workflow only prints a warning.
 
 `database.rules.json` is not in this public repository because it contains the owner's email.
-
-## Team
-
-**Team D16** · Day Division, CSIE Year 5, Class B · National Taichung University of Science and Technology
-
-| Role | Name |
-|---|---|
-| Advisor | 周孝興 |
-| Members | 蘇立庠 · 鄭羽紋 · 林家濬 |
