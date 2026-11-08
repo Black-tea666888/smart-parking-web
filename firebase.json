@@ -1,0 +1,56 @@
+{
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "database.rules.json",
+      "**/.*",
+      "**/.git/**",
+      "**/* 2.*"
+    ],
+    "headers": [
+      {
+        "source": "**/sw.js",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**/manifest.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/manifest+json"
+          }
+        ]
+      }
+    ],
+    "redirects": [
+      {
+        "source": "/user.html",
+        "destination": "/user/",
+        "type": 301
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/user",
+        "destination": "/user/index.html"
+      },
+      {
+        "source": "/user/**",
+        "destination": "/user/index.html"
+      }
+    ]
+  }
+}

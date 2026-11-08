@@ -1,0 +1,5 @@
+.firebase/
+.DS_Store
+# 含業主信箱，不公開在 GitHub
+database.rules.json
+.test_reserve_rules.sh

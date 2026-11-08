@@ -1,0 +1,2889 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="智慧停車">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23F5B700'/><text x='50' y='73' font-size='66' font-weight='900' font-family='Inter,sans-serif' text-anchor='middle' fill='%231a1200'>P</text></svg>">
+<title>雲端載重智慧車位偵測 後台管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23F5B700'/><text x='50' y='73' font-size='66' font-weight='900' font-family='Inter,sans-serif' text-anchor='middle' fill='%231a1200'>P</text></svg>">
+<style>
+/* ── Design Tokens ──────────────────────────────────────────────── */
+:root {
+  --brand:    #F5B700;
+  --free:     #2A9D8F;
+  --taken:    #D64545;
+  --ink:      #111827;
+  --ink-2:    #374151;
+  --ink-3:    #6B7280;
+  --border:   rgba(0,0,0,0.08);
+  --bg:       #F8FAFC;
+  --surface:  #FFFFFF;
+  --sf2:      #F9FAFB;
+  --sb-bg:    #0F172A;
+  --sb-hover: rgba(255,255,255,0.06);
+  --sb-active:rgba(255,255,255,0.10);
+  --sb-border:rgba(255,255,255,0.08);
+  --sb-ink:   #F8FAFC;
+  --sb-ink-2: #94A3B8;
+  --sb-ink-3: #64748B;
+  --sb-width: 220px;
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+  --sh-xs: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --sh-sm: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
+  --sh-md: 0 4px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  --sh-lg: 0 12px 32px rgba(0,0,0,.14), 0 4px 12px rgba(0,0,0,.08);
+}
+body.dark {
+  --ink:    #F9FAFB;
+  --ink-2:  #D1D5DB;
+  --ink-3:  #9CA3AF;
+  --border: rgba(255,255,255,0.08);
+  --bg:     #0D1117;
+  --surface:#161B22;
+  --sf2:    #1F2937;
+  --sh-xs:  0 1px 3px rgba(0,0,0,.4);
+  --sh-sm:  0 2px 8px rgba(0,0,0,.4);
+  --sh-md:  0 4px 16px rgba(0,0,0,.4);
+  --sh-lg:  0 12px 32px rgba(0,0,0,.5);
+}
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+* { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  transition: background .25s, color .25s;
+  overscroll-behavior: none;
+}
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+.modal-bg.hidden { display: none; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 32px 32px 28px;
+  width: 100%; max-width: 380px; margin: 16px;
+  box-shadow: var(--sh-lg);
+  animation: slideUp .2s cubic-bezier(.16,1,.3,1);
+  transition: background .25s, border-color .25s;
+}
+@keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:none;opacity:1} }
+.modal-icon  { font-size: 30px; text-align: center; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+.modal-msg   { font-size: 13.5px; color: var(--ink-3); text-align: center; line-height: 1.65; margin-bottom: 24px; white-space: pre-wrap; }
+.modal-btns  { display: flex; gap: 10px; }
+.modal-cancel {
+  flex: 1; padding: 11px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--sf2);
+  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2);
+  cursor: pointer; transition: background .15s;
+}
+.modal-cancel:hover { background: var(--border); }
+.modal-ok {
+  flex: 1; padding: 11px; border-radius: var(--r-sm);
+  border: none; background: var(--ink); color: var(--brand);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.modal-ok:hover  { opacity: .88; }
+.modal-ok.danger { background: var(--taken); color: #fff; }
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+#toast-wrap {
+  position: fixed; bottom: 24px; right: 24px;
+  display: flex; flex-direction: column-reverse; gap: 10px;
+  z-index: 600; pointer-events: none;
+}
+.toast {
+  padding: 12px 18px; border-radius: var(--r-md);
+  font-size: 13px; font-weight: 600;
+  box-shadow: var(--sh-md); max-width: 320px;
+  opacity: 0; transform: translateX(16px);
+  transition: opacity .22s, transform .22s;
+  pointer-events: auto;
+}
+.toast.show { opacity: 1; transform: none; }
+.toast-ok   { background: rgba(42,157,143,.1); border: 1px solid rgba(42,157,143,.3); color: var(--free); }
+.toast-err  { background: rgba(214,69,69,.1);  border: 1px solid rgba(214,69,69,.3);  color: var(--taken); }
+.toast-info { background: var(--surface); border: 1px solid var(--border); color: var(--ink-2); }
+body.dark .toast-info { background: var(--sf2); }
+
+/* ── Login ──────────────────────────────────────────────────────── */
+#login-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: var(--bg);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  display: flex; align-items: center; justify-content: center;
+}
+#login-overlay.hidden { display: none; }
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-xl); padding: 48px 44px;
+  width: 100%; max-width: 400px; margin: 16px;
+  box-shadow: var(--sh-lg);
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  transition: background .25s, border-color .25s;
+}
+.login-logo {
+  width: 60px; height: 60px; border-radius: 18px;
+  background: var(--brand); color: #1F2933;
+  font-weight: 900; font-size: 34px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(245,183,0,.4); margin-bottom: 4px;
+}
+.login-title { font-size: 24px; font-weight: 800; letter-spacing: -.5px; text-align: center; }
+.login-sub   { font-size: 14px; color: var(--ink-3); margin-top: -8px; margin-bottom: 6px; }
+.login-field { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.login-label { font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.login-input {
+  width: 100%; padding: 11px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); background: var(--sf2);
+  color: var(--ink); font-family: inherit; font-size: 16px; outline: none;
+  transition: border-color .15s, box-shadow .15s, background .25s;
+}
+.login-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(245,183,0,.18); }
+.login-btn {
+  width: 100%; padding: 13px; border-radius: var(--r-sm); border: none;
+  background: var(--ink); color: var(--brand);
+  font-family: inherit; font-weight: 700; font-size: 15px;
+  cursor: pointer; transition: opacity .15s, transform .1s; margin-top: 4px;
+}
+.login-btn:hover  { opacity: .88; }
+.login-btn:active { transform: scale(.99); }
+.login-btn:disabled { opacity: .45; cursor: not-allowed; }
+#login-error { color: var(--taken); font-size: 13px; min-height: 18px; text-align: center; font-weight: 500; }
+.login-switch { font-size: 13px; color: var(--ink-3); margin-top: -6px; }
+.login-switch button {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: underline;
+}
+#login-pw2-field { display: none; }
+.login-card.reg #login-pw2-field { display: flex; }
+.login-card.reg #login-forgot { display: none; }
+#login-error.ok { color: var(--free); }
+#login-resend { display: none; }
+
+/* ── App shell layout ───────────────────────────────────────────── */
+#sb-overlay {
+  display: none; position: fixed; inset: 0; z-index: 149;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+#sb-overlay.show { display: block; }
+
+.app-shell {
+  display: flex; min-height: 100dvh;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sb-width); flex-shrink: 0;
+  background: var(--sb-bg);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 150;
+  border-right: 1px solid var(--sb-border);
+  transition: transform .28s cubic-bezier(.16,1,.3,1);
+  overflow: hidden;
+}
+
+.sb-logo-section {
+  padding: calc(20px + env(safe-area-inset-top)) 16px 16px;
+  border-bottom: 1px solid var(--sb-border);
+  display: flex; align-items: center; gap: 11px;
+  flex-shrink: 0;
+}
+.sb-logo-icon {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--brand); color: #1F2933;
+  font-weight: 900; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(245,183,0,.35);
+}
+.sb-logo-text { flex: 1; min-width: 0; }
+.sb-logo-title {
+  font-size: 13px; font-weight: 700; color: var(--sb-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: -.1px;
+}
+.sb-logo-sub {
+  font-size: 10.5px; color: var(--sb-ink-3); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.sb-nav {
+  flex: 1;
+  padding: 10px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sb-nav::-webkit-scrollbar { width: 3px; }
+.sb-nav::-webkit-scrollbar-track { background: transparent; }
+.sb-nav::-webkit-scrollbar-thumb { background: var(--sb-border); border-radius: 3px; }
+
+.sb-section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--sb-ink-3);
+  padding: 10px 10px 6px;
+}
+
+.sb-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer; user-select: none;
+  color: var(--sb-ink-2);
+  font-size: 13.5px; font-weight: 500;
+  transition: background .15s, color .15s;
+  position: relative;
+  white-space: nowrap;
+}
+a.sb-item { text-decoration: none; }
+#sb-owner { display: none; }
+body.is-owner #sb-owner { display: flex; }
+/* 業主在 /owner/ 授權的權限：沒有的功能就藏起按鈕 */
+body.no-parking .btn-toggle, body.no-maint .btn-maint,
+body.no-clear #btn-clear-log, body.no-export #btn-export { display: none; }
+.sb-item svg { flex-shrink: 0; opacity: .75; transition: opacity .15s; }
+.sb-item:hover { background: var(--sb-hover); color: var(--sb-ink); }
+.sb-item:hover svg { opacity: 1; }
+.sb-item.active {
+  background: var(--sb-active);
+  color: var(--sb-ink); font-weight: 600;
+}
+.sb-item.active svg { opacity: 1; }
+.sb-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 2px 2px 0;
+  background: var(--brand);
+}
+.sb-badge {
+  display: none; min-width: 18px; height: 18px;
+  background: var(--taken); color: #fff;
+  border-radius: 9px; font-size: 10px; font-weight: 700;
+  text-align: center; line-height: 18px; padding: 0 5px;
+  margin-left: auto;
+}
+.sb-badge.show { display: inline-block; }
+
+.sb-footer {
+  padding: 12px 8px;
+  border-top: 1px solid var(--sb-border);
+  display: flex; flex-direction: column; gap: 4px;
+  flex-shrink: 0;
+}
+
+.sb-conn-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r-sm);
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--sb-border);
+}
+.sb-conn-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  transition: background .3s;
+}
+.sb-conn-dot.online  { background: var(--free); }
+.sb-conn-dot.offline { background: var(--taken); }
+.sb-conn-dot.pulse   { animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot {
+  0%,100%{ box-shadow: 0 0 0 0 rgba(42,157,143,.6); }
+  50%    { box-shadow: 0 0 0 5px rgba(42,157,143,0); }
+}
+.sb-conn-text { font-size: 12px; color: var(--sb-ink-2); font-weight: 500; }
+
+.sb-toggle-row {
+  display: flex; gap: 4px;
+}
+.sb-toggle-btn {
+  flex: 1; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--sb-border);
+  background: transparent;
+  color: var(--sb-ink-2);
+  font-family: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.sb-toggle-btn:hover { background: var(--sb-hover); color: var(--sb-ink); }
+.sb-toggle-btn.active {
+  background: rgba(245,183,0,.12);
+  border-color: rgba(245,183,0,.3);
+  color: var(--brand);
+}
+
+.sb-user-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r-sm);
+}
+.sb-user-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--sb-active);
+  border: 1px solid var(--sb-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--sb-ink-2);
+  flex-shrink: 0;
+}
+.sb-user-email {
+  flex: 1; min-width: 0;
+  font-size: 11.5px; color: var(--sb-ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sb-logout-btn {
+  padding: 4px 9px; border-radius: var(--r-sm);
+  border: 1px solid var(--sb-border);
+  background: transparent;
+  color: var(--sb-ink-3); font-family: inherit; font-size: 11px; font-weight: 500;
+  cursor: pointer; flex-shrink: 0;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.sb-logout-btn:hover {
+  background: rgba(214,69,69,.12);
+  border-color: rgba(214,69,69,.3);
+  color: #FC8181;
+}
+
+/* ── Main area ──────────────────────────────────────────────────── */
+.main-wrap {
+  margin-left: var(--sb-width);
+  flex: 1;
+  min-width: 0;
+  display: flex; flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* ── Top header bar ─────────────────────────────────────────────── */
+.top-bar {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+  transition: background .25s, border-color .25s;
+  flex-shrink: 0;
+}
+#btn-menu {
+  display: none;
+  width: 34px; height: 34px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--sf2);
+  cursor: pointer; align-items: center; justify-content: center;
+  color: var(--ink-2); flex-shrink: 0;
+  transition: background .15s;
+}
+#btn-menu:hover { background: var(--border); }
+#page-title {
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px; color: var(--ink);
+}
+.top-bar-right {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 8px;
+}
+.top-live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--free); flex-shrink: 0;
+  animation: pulse-dot 2s infinite;
+}
+#last-sync {
+  font-size: 12px; color: var(--ink-3); white-space: nowrap;
+}
+
+/* ── Content ────────────────────────────────────────────────────── */
+.content {
+  flex: 1; padding: 28px 28px 48px;
+  max-width: 1160px; width: 100%; margin: 0 auto;
+}
+
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Banners ────────────────────────────────────────────────────── */
+.banner {
+  border-radius: var(--r-md); padding: 12px 18px;
+  margin-bottom: 18px; font-size: 13px; font-weight: 600;
+  display: none; align-items: center; gap: 10px;
+}
+.banner.show { display: flex; }
+#full-banner  { background: rgba(214,69,69,.06); border: 1px solid rgba(214,69,69,.2); color: var(--taken); }
+#device-banner { background: rgba(214,69,69,.06); border: 1px solid rgba(214,69,69,.2); color: var(--taken); }
+#alert-banner { background: rgba(245,183,0,.06); border: 1px solid rgba(245,183,0,.3); color: #92650A; }
+body.dark #alert-banner { color: var(--brand); }
+
+/* ── KPI Grid ───────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+
+/* Ring card */
+.ring-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px 22px;
+  display: flex; align-items: center; gap: 18px;
+  box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s, box-shadow .15s;
+  min-width: 200px;
+}
+.ring-card:hover { box-shadow: var(--sh-sm); }
+.ring-svg-wrap {
+  position: relative; flex-shrink: 0; width: 84px; height: 84px;
+}
+.ring-svg-wrap svg { width: 84px; height: 84px; transform: rotate(-90deg); }
+#ring-circle {
+  fill: none; stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dasharray .5s cubic-bezier(.4,0,.2,1), stroke .35s;
+}
+#ring-track {
+  fill: none; stroke-width: 8; stroke: var(--border);
+}
+.ring-center {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+}
+#ring-pct {
+  font-size: 17px; font-weight: 800; letter-spacing: -.5px; color: var(--ink);
+  line-height: 1;
+}
+.ring-pct-lbl {
+  font-size: 9px; font-weight: 600; color: var(--ink-3); margin-top: 1px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.ring-info { min-width: 0; }
+/* AI 摘要：對話框（尖角指向「AI 摘要」按鈕） */
+.ai-row { margin-bottom: 16px; }
+.ai-btn { padding: 9px 18px; border: 0; border-radius: 10px; background: #F5B700; color: #1F2933; font-weight: 700; font-size: 14px; cursor: pointer; }
+.ai-btn:disabled { opacity: .6; cursor: default; }
+.ai-ans{position:relative;align-self:stretch;min-width:0;padding:34px 16px 14px;border-radius:16px;border:1px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,rgba(245,183,0,.85),var(--border) 55%) border-box;box-shadow:0 6px 20px rgba(245,183,0,.10),0 2px 6px rgba(0,0,0,.06);font-size:14px;line-height:1.7;color:var(--ink);overflow-wrap:anywhere;animation:aiIn .3s ease-out}
+.ai-ans:empty{display:none}
+.ai-ans::before{content:"";position:absolute;top:-7px;left:26px;width:12px;height:12px;background:var(--surface);border-left:1px solid rgba(245,183,0,.85);border-top:1px solid rgba(245,183,0,.85);transform:rotate(45deg)}
+.ai-ans::after{content:"AI 助理";position:absolute;top:9px;left:14px;padding:2px 9px;border-radius:999px;background:linear-gradient(135deg,#F5B700,#FFD45C);color:#1F2933;font-size:11px;font-weight:800;letter-spacing:.05em}
+.ai-ans.think{color:var(--ink-3)}
+.ai-ans .dots{display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle}
+.ai-ans .dots i{width:6px;height:6px;border-radius:50%;background:#F5B700;animation:aiDot 1s ease-in-out infinite}
+.ai-ans .dots i:nth-child(2){animation-delay:.15s}
+.ai-ans .dots i:nth-child(3){animation-delay:.3s}
+.ai-ans .aiSpot{display:inline-block;margin:0 2px;padding:0 7px;border-radius:7px;background:rgba(245,183,0,.18);border:1px solid rgba(245,183,0,.55);color:inherit;font:inherit;font-weight:700;line-height:1.5}
+.ai-ans .aiQ{margin-bottom:6px;font-size:12px;color:var(--ink-3)}
+.ai-ans .aiBody.live::after{content:"";display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-2px;background:#F5B700;animation:aiCaret .8s steps(1) infinite}
+.ai-ans .aiSpeak{position:absolute;top:6px;right:8px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;font-size:15px;line-height:30px;cursor:pointer;opacity:.75}
+.ai-ans .aiSpeak:hover{opacity:1;background:rgba(245,183,0,.15)}
+.aiAsk{display:flex;gap:8px;align-self:stretch;margin-top:8px}
+.aiAsk input{flex:1;min-width:0;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font:inherit;font-size:16px}
+.aiAsk input:focus{outline:none;border-color:#F5B700;box-shadow:0 0 0 3px rgba(245,183,0,.2)}
+.aiAsk button{flex:none;width:44px;border:0;border-radius:12px;background:#F5B700;color:#1F2933;font-size:16px;font-weight:800;cursor:pointer}
+.aiAsk button:disabled{opacity:.6;cursor:default}
+.ai-ans button.aiSpot{cursor:pointer}
+.aiChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.aiChips button{padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:13px;cursor:pointer}
+.aiChips button:hover{border-color:#F5B700}
+.aiAsk .aiMic{background:var(--border);color:var(--ink)}
+.aiAsk .aiMic.rec{background:var(--taken);color:#fff;animation:aiGlow 1.2s ease-out infinite}
+.spot-card.ai-hl{outline:3px solid #F5B700;outline-offset:2px}
+@keyframes aiCaret{50%{opacity:0}}
+.ai-ans.notice::after{content:"AI 提醒"}
+.ai-ans.local::after{content:"快速摘要";background:var(--border);color:var(--ink)}
+.ai-ans.report::after{content:"AI 日報"}
+.ai-ans .aiBody{white-space:pre-line}
+.ai-btn2{margin-left:8px;background:transparent;border:1.5px solid #F5B700;color:var(--ink)}
+.ai-ans .aiCopy{position:absolute;top:6px;right:42px;height:30px;padding:0 10px;border:0;border-radius:15px;background:transparent;color:var(--ink-3);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.ai-ans .aiCopy:hover{background:rgba(245,183,0,.15);color:var(--ink)}
+/* 進場熱度：近 7 天 × 24 小時 */
+.heat{display:grid;grid-template-columns:54px repeat(24,minmax(0,1fr));gap:2px;font-size:10px;color:var(--ink-3)}
+.heat i{height:18px;border-radius:3px;background:var(--border)}
+.heat span{align-self:center;white-space:nowrap}
+.heat em{grid-column:span 6;font-style:normal}
+.ai-ans.notice{animation:aiIn .3s ease-out,aiGlow 1.6s ease-out 2}
+.ai-ans .aiReset{margin-left:8px;padding:0;border:0;background:none;color:#B88A00;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+@keyframes aiGlow{40%{box-shadow:0 0 0 4px rgba(245,183,0,.35)}}
+@keyframes aiIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes aiDot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-4px);opacity:1}}
+.ring-free-num {
+  font-size: 34px; font-weight: 900; line-height: 1;
+  letter-spacing: -.8px; color: var(--free);
+  transition: color .3s;
+}
+.ring-free-num.full { color: var(--taken); }
+.ring-free-lbl { font-size: 12px; color: var(--ink-3); font-weight: 500; margin-top: 3px; }
+.ring-sub-row { display: flex; gap: 14px; margin-top: 10px; }
+.ring-sub-item { font-size: 11px; color: var(--ink-3); display: flex; align-items: center; gap: 4px; }
+.ring-sub-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* Stat cards */
+.kpi-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px 20px 18px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s, box-shadow .15s;
+  min-height: 108px;
+}
+.kpi-card:hover { box-shadow: var(--sh-sm); }
+.kpi-card-top {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.kpi-icon {
+  width: 38px; height: 38px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center; font-size: 19px;
+  flex-shrink: 0;
+}
+.ki-free  { background: rgba(42,157,143,.1); }
+.ki-amber { background: rgba(245,183,0,.12); }
+.ki-gray  { background: var(--sf2); border: 1px solid var(--border); }
+.kpi-val  {
+  font-size: 32px; font-weight: 800; line-height: 1.05; letter-spacing: -.6px;
+  transition: color .3s;
+}
+.kv-free  { color: var(--free); }
+.kv-taken { color: var(--taken); }
+.kv-amber { color: var(--brand); }
+.kv-ink   { color: var(--ink); }
+.kpi-lbl  { font-size: 11.5px; font-weight: 500; color: var(--ink-3); margin-top: 5px; }
+.kpi-bar  {
+  height: 3px; border-radius: 2px; background: var(--border);
+  overflow: hidden; margin-top: 12px;
+}
+.kpi-bar-fill {
+  height: 100%; border-radius: 2px; background: var(--free);
+  transition: width .5s cubic-bezier(.4,0,.2,1), background .3s;
+}
+.kpi-bar-fill.warn { background: var(--brand); }
+.kpi-bar-fill.over { background: var(--taken); }
+
+/* ── Panel ──────────────────────────────────────────────────────── */
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 20px 22px;
+  margin-bottom: 20px; box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s;
+}
+.panel-hd {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 10px; margin-bottom: 18px;
+}
+.panel-title, .chart-range-btn, .panel-meta { white-space: nowrap; }
+.panel-title { font-size: 13.5px; font-weight: 600; letter-spacing: -.1px; color: var(--ink); }
+.panel-meta  { font-size: 12px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.legend-dash {
+  width: 18px; height: 2px;
+  background: repeating-linear-gradient(to right, var(--taken) 0,var(--taken) 5px,transparent 5px,transparent 9px);
+}
+
+/* ── Chart ──────────────────────────────────────────────────────── */
+canvas#usage-chart { width: 100%; height: 150px; display: block; cursor: crosshair; }
+
+/* ── Spots Layout ───────────────────────────────────────────────── */
+.spots-layout {
+  display: grid; grid-template-columns: 1fr 1px 1fr; gap: 28px;
+}
+.zone-sep  { background: var(--border); margin-top: 38px; }
+.zone-hd   { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.zone-name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.zone-badge {
+  font-size: 11px; font-weight: 600; color: var(--ink-3);
+  background: var(--sf2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2px 9px;
+}
+.zone-icon { font-size: 15px; }
+
+/* ── Spot Grid (2×2) ────────────────────────────────────────────── */
+.spots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+/* ── Spot Card Redesign ─────────────────────────────────────────── */
+.spot-card {
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  overflow: hidden;
+  min-height: 140px;
+  display: flex; flex-direction: column;
+  position: relative;
+  transition: transform .15s, box-shadow .15s, background .25s, border-color .25s;
+}
+.spot-card:not(.dis):not(.loading) { cursor: pointer; }
+.spot-card:not(.dis):not(.loading):hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
+.spot-card.free   { background: rgba(42,157,143,.05); border-color: rgba(42,157,143,.25); }
+.spot-card.taken  { background: rgba(214,69,69,.05);  border-color: rgba(214,69,69,.25); }
+.spot-card.dis    { background: var(--sf2); border-color: var(--border); }
+.spot-card.held   { background: rgba(245,183,0,.06); border-color: rgba(245,183,0,.4); }
+.spot-card.held    .sc-accent     { background: var(--brand); }
+.spot-card.held    .sc-label      { color: #A87700; }
+.spot-card.held    .sc-status-dot { background: var(--brand); }
+.spot-card.held    .sc-pill       { background: rgba(245,183,0,.16); color: #8A6200; }
+body.dark .spot-card.held .sc-label, body.dark .spot-card.held .sc-pill { color: var(--brand); }
+.spot-card.loading{ background: var(--sf2); border-color: var(--border); animation: shimmer 1.5s ease infinite; }
+@keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:.55} }
+
+/* 3px accent bar top */
+.sc-accent {
+  height: 3px; width: 100%; flex-shrink: 0;
+  transition: background .25s;
+}
+.spot-card.free    .sc-accent { background: var(--free); }
+.spot-card.taken   .sc-accent { background: var(--taken); }
+.spot-card.dis     .sc-accent { background: var(--ink-3); opacity: .35; }
+.spot-card.loading .sc-accent { background: var(--border); }
+
+.sc-body {
+  padding: 13px 13px 11px;
+  display: flex; flex-direction: column; flex: 1;
+}
+
+.sc-top-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.sc-label {
+  font-size: 24px; font-weight: 900; line-height: 1; letter-spacing: -.5px;
+}
+.spot-card.free    .sc-label { color: var(--free); }
+.spot-card.taken   .sc-label { color: var(--taken); }
+.spot-card.dis     .sc-label { color: var(--ink-3); }
+.spot-card.loading .sc-label { color: var(--border); }
+
+/* status dot */
+.sc-status-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+}
+.spot-card.free    .sc-status-dot { background: var(--free); }
+.spot-card.taken   .sc-status-dot { background: var(--taken); animation: pulse-taken 2s infinite; }
+.spot-card.dis     .sc-status-dot { background: var(--ink-3); opacity: .4; }
+.spot-card.loading .sc-status-dot { background: var(--border); }
+@keyframes pulse-taken {
+  0%,100%{ box-shadow: 0 0 0 0 rgba(214,69,69,.5); }
+  50%    { box-shadow: 0 0 0 5px rgba(214,69,69,0); }
+}
+
+.sc-pill {
+  display: inline-flex; align-items: center;
+  font-size: 10.5px; font-weight: 600;
+  padding: 3px 9px; border-radius: 20px;
+}
+.spot-card.free    .sc-pill { background: rgba(42,157,143,.12); color: var(--free); }
+.spot-card.taken   .sc-pill { background: rgba(214,69,69,.12);  color: var(--taken); }
+.spot-card.dis     .sc-pill { background: var(--sf2); color: var(--ink-3); border: 1px solid var(--border); }
+.spot-card.loading .sc-pill { background: var(--border); color: transparent; min-width: 44px; }
+
+.sc-dur {
+  font-size: 10.5px; color: var(--ink-3); margin-top: 5px; flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+.sc-unstable {
+  position: absolute; bottom: 9px; right: 9px;
+  font-size: 9px; font-weight: 700;
+  background: #FFF3CD; color: #856404;
+  border-radius: 4px; padding: 2px 6px;
+}
+body.dark .sc-unstable { background: rgba(245,183,0,.15); color: var(--brand); }
+
+.sc-actions { display: flex; gap: 5px; margin-top: 10px; }
+.btn-xs {
+  font-size: 10.5px; font-weight: 600; padding: 4px 9px;
+  border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent; font-family: inherit; color: var(--ink-3);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.btn-xs:hover       { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-maint.on       { border-color: var(--free); color: var(--free); }
+.btn-maint.on:hover { background: var(--free); border-color: var(--free); color: #fff; }
+
+/* ── Flash ──────────────────────────────────────────────────────── */
+@keyframes flash-free  { 0%,100%{background:rgba(42,157,143,.05)} 40%{background:rgba(42,157,143,.22)} }
+@keyframes flash-taken { 0%,100%{background:rgba(214,69,69,.05)}  40%{background:rgba(214,69,69,.22)} }
+.spot-card.flash-free  { animation: flash-free  .7s ease; }
+.spot-card.flash-taken { animation: flash-taken .7s ease; }
+
+/* ── Log ────────────────────────────────────────────────────────── */
+.log-hd {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+}
+.log-title { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+.log-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.log-sel {
+  height: 34px; padding: 0 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink-2); font-family: inherit; font-size: 13px;
+  cursor: pointer; outline: none;
+  transition: background .25s, border-color .25s, color .25s;
+}
+.log-today {
+  font-size: 12px; color: var(--ink-3); white-space: nowrap;
+  background: var(--sf2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); height: 34px; padding: 0 12px;
+  display: flex; align-items: center; font-weight: 500;
+}
+.btn-clear {
+  height: 34px; padding: 0 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  font-family: inherit; font-size: 13px; font-weight: 500; color: var(--ink-3);
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.btn-clear:hover {
+  background: rgba(214,69,69,.06);
+  border-color: rgba(214,69,69,.3); color: var(--taken);
+}
+.btn-export {
+  height: 34px; padding: 0 16px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  font-family: inherit; font-weight: 600; font-size: 13px; color: var(--ink-2);
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: background .15s, box-shadow .15s;
+}
+.btn-export:hover { background: var(--sf2); box-shadow: var(--sh-xs); }
+.log-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s;
+}
+.log-table { width: 100%; border-collapse: collapse; }
+.log-table th {
+  text-align: left; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--ink-3);
+  padding: 11px 18px; border-bottom: 1px solid var(--border);
+  background: var(--sf2);
+}
+.log-table td { padding: 11px 18px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--ink); }
+.log-table tr:last-child td { border-bottom: none; }
+.log-table tbody tr:hover td { background: var(--sf2); }
+.log-st.free  { color: var(--free);  font-weight: 600; }
+.log-st.taken { color: var(--taken); font-weight: 600; }
+.log-st.maint { color: var(--ink-2);  font-weight: 600; }
+.log-spots { position: relative; }
+.log-spots > summary { list-style: none; display: flex; align-items: center; }
+.log-spots > summary::-webkit-details-marker { display: none; }
+.log-spots-pop {
+  position: absolute; top: 40px; left: 0; z-index: 20; width: 220px; padding: 10px;
+  border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); display: grid; grid-template-columns: repeat(4,1fr); gap: 6px;
+}
+.log-spots-pop label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.log-spots-pop .q { grid-column: 1 / -1; display: flex; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.log-spots-pop .q button { flex: 1; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--sf2); color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer; }
+.log-empty { text-align: center; padding: 60px 0; color: var(--ink-3); font-size: 14px; }
+
+/* ── Floor Plan ─────────────────────────────────────────────────── */
+.floor-plan {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 28px 28px 24px;
+  box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s;
+}
+.fp-zone-hd {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+.fp-zone-name  { font-size: 14px; font-weight: 700; }
+.fp-zone-badge {
+  font-size: 11px; font-weight: 600; color: var(--ink-3);
+  background: var(--sf2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2px 9px;
+}
+.fp-spots-row {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
+}
+.fp-spot {
+  border-radius: var(--r-md); border: 2px solid;
+  padding: 12px 10px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  cursor: pointer; position: relative; overflow: hidden;
+  min-height: 170px; transition: transform .15s, box-shadow .15s, background .25s;
+}
+.fp-spot::after {
+  content: ''; position: absolute;
+  top: 0; left: 8px; right: 8px; height: 3px;
+  border-radius: 0 0 3px 3px;
+  transition: background .3s;
+}
+.fp-spot.free   { background: rgba(42,157,143,.05); border-color: rgba(42,157,143,.28); }
+.fp-spot.taken  { background: rgba(214,69,69,.05);  border-color: rgba(214,69,69,.28); }
+.fp-spot.dis    { background: var(--sf2); border-color: var(--border); opacity: .6; cursor: default; }
+.fp-spot.held   { background: rgba(245,183,0,.06); border-color: rgba(245,183,0,.4); }
+.fp-spot.held::after { background: var(--brand); }
+.fp-spot.held   .fp-spot-id   { color: #A87700; }
+.fp-spot.held   .fp-spot-pill { background: rgba(245,183,0,.16); color: #8A6200; }
+body.dark .fp-spot.held .fp-spot-id, body.dark .fp-spot.held .fp-spot-pill { color: var(--brand); }
+.fp-spot.loading{ background: var(--sf2); border-color: var(--border); animation: shimmer 1.5s ease infinite; }
+.fp-spot.free::after  { background: var(--free); }
+.fp-spot.taken::after { background: var(--taken); }
+.fp-spot:not(.dis):not(.loading):hover { transform: translateY(-3px); box-shadow: var(--sh-md); }
+.fp-spot-id {
+  font-size: 16px; font-weight: 900; letter-spacing: -.4px;
+  align-self: flex-start; line-height: 1;
+}
+.fp-spot.free   .fp-spot-id { color: var(--free); }
+.fp-spot.taken  .fp-spot-id { color: var(--taken); }
+.fp-spot.dis    .fp-spot-id { color: var(--ink-3); }
+.fp-spot.loading .fp-spot-id { color: var(--border); }
+.fp-car-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 4px 0;
+}
+.fp-spot-pill {
+  font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+}
+.fp-spot.free   .fp-spot-pill { background: rgba(42,157,143,.12); color: var(--free); }
+.fp-spot.taken  .fp-spot-pill { background: rgba(214,69,69,.12);  color: var(--taken); }
+.fp-spot.dis    .fp-spot-pill { background: var(--border); color: var(--ink-3); }
+.fp-spot.loading .fp-spot-pill { background: var(--border); color: transparent; min-width: 36px; }
+.fp-spot-dur { font-size: 10px; color: var(--ink-3); }
+.fp-lane {
+  display: flex; align-items: center; gap: 14px; margin: 20px 0;
+}
+.fp-lane-line {
+  flex: 1; height: 2px;
+  background: repeating-linear-gradient(to right,
+    var(--border) 0, var(--border) 12px, transparent 12px, transparent 22px);
+}
+.fp-lane-lbl {
+  font-size: 10px; font-weight: 700; color: var(--ink-3);
+  letter-spacing: .6px; text-transform: uppercase; white-space: nowrap;
+}
+@keyframes fp-flash-free  { 0%,100%{background:rgba(42,157,143,.05)} 40%{background:rgba(42,157,143,.22)} }
+@keyframes fp-flash-taken { 0%,100%{background:rgba(214,69,69,.05)}  40%{background:rgba(214,69,69,.22)} }
+.fp-spot.flash-free  { animation: fp-flash-free  .8s ease; }
+.fp-spot.flash-taken { animation: fp-flash-taken .8s ease; }
+@media (max-width: 680px) {
+  .fp-spots-row { grid-template-columns: repeat(2,1fr); }
+  .fp-spot { min-height: 140px; }
+}
+
+/* ── Log analytics ──────────────────────────────────────────────── */
+.log-analytics {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+  margin-bottom: 16px;
+}
+.log-an-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 16px 18px;
+  box-shadow: var(--sh-xs);
+  transition: background .25s, border-color .25s;
+}
+.log-an-val { font-size: 24px; font-weight: 800; letter-spacing: -.5px; color: var(--ink); }
+.log-an-lbl { font-size: 11px; color: var(--ink-3); margin-top: 3px; font-weight: 500; }
+@media (max-width: 520px) { .log-analytics { grid-template-columns: 1fr 1fr; } }
+
+
+/* ── Section page header ────────────────────────────────────────── */
+.section-hd {
+  margin-bottom: 22px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.section-hd-title { font-size: 20px; font-weight: 800; letter-spacing: -.4px; color: var(--ink); }
+.section-hd-sub   { font-size: 13px; color: var(--ink-3); margin-top: 3px; }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .ring-card { grid-column: 1 / -1; }
+}
+@media (max-width: 820px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .ring-card { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  #sidebar {
+    transform: translateX(calc(-1 * var(--sb-width)));
+  }
+  #sidebar.open {
+    transform: translateX(0);
+    box-shadow: var(--sh-lg);
+  }
+  .main-wrap { margin-left: 0; }
+  #btn-menu { display: flex; }
+  .top-bar {
+    height: calc(56px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+}
+@media (max-width: 680px) {
+  .content { padding: 18px 16px 40px; }
+  .top-bar { padding: 0 16px; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ring-card { min-width: unset; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .ring-sub-row { display: none; }
+  .spots-layout { grid-template-columns: 1fr; gap: 20px; }
+  .zone-sep { display: none; }
+  .spots-grid { grid-template-columns: repeat(2, 1fr); }
+  
+  .log-hd { flex-direction: column; align-items: flex-start; }
+  #toast-wrap { bottom: 16px; right: 16px; }
+  .login-card { padding: 36px 24px; }
+  .log-table th:nth-child(4),
+  .log-table td:nth-child(4) { display: none; }
+}
+@media (max-width: 440px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .ring-card { flex-direction: row; }
+}
+
+/* Tab transition */
+.section.active { animation: tabFadeIn .2s ease; }
+@keyframes tabFadeIn { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
+
+.sc-sparkline { width:100%; height:20px; display:block; margin-top:8px; border-radius:3px; overflow:hidden; }
+
+.chart-range-btns { display:flex; gap:4px; }
+.chart-range-btn {
+  height:26px; padding:0 11px; border-radius:6px;
+  border:1px solid var(--border); background:transparent;
+  font-family:inherit; font-size:11px; font-weight:600; color:var(--ink-3);
+  cursor:pointer; transition:background .12s,color .12s,border-color .12s;
+}
+.chart-range-btn:hover { border-color:var(--ink-3); color:var(--ink-2); }
+.chart-range-btn.active { background:var(--ink); border-color:var(--ink); color:var(--brand); }
+
+.fp-entrance {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  margin-top:20px; padding-top:16px;
+  border-top:2px dashed var(--border);
+  font-size:11px; font-weight:700; color:var(--ink-3);
+  letter-spacing:.6px; text-transform:uppercase;
+}
+
+/* Bottom nav (mobile) */
+#bottom-nav {
+  display:none; position:fixed; bottom:0; left:0; right:0;
+  height:calc(58px + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  background:var(--surface); border-top:1px solid var(--border);
+  z-index:200; grid-template-columns:repeat(3,1fr);
+  box-shadow:0 -2px 12px rgba(0,0,0,.06);
+  transition:background .25s,border-color .25s;
+}
+.bn-item {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; padding:6px 4px; border:none; background:none;
+  cursor:pointer; font-family:inherit; color:var(--ink-3);
+  position:relative; transition:color .15s;
+}
+.bn-item.active { color:var(--brand); }
+.bn-item svg { opacity:.7; }
+.bn-item.active svg { opacity:1; }
+.bn-item-label { font-size:10px; font-weight:600; }
+.bn-badge {
+  position:absolute; top:5px; right:calc(50% - 16px);
+  min-width:14px; height:14px; background:var(--taken); color:#fff;
+  border-radius:7px; font-size:8px; font-weight:700;
+  text-align:center; line-height:14px; padding:0 3px; display:none;
+}
+.bn-badge.show { display:block; }
+@media (max-width:900px) {
+  #bottom-nav { display:grid; }
+  .content { padding-bottom:calc(74px + env(safe-area-inset-bottom)); }
+  #toast-wrap { bottom:calc(74px + env(safe-area-inset-bottom) + 8px); right:16px; }
+}
+.ic{display:inline-block;vertical-align:-0.15em;flex:none}
+</style>
+<script>window.ICON={building:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg>',tree:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg>',chart:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20V11M11 20V5M16 20v-6"/></svg>',mic:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',send:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',speaker:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>',copy:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',download:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',logout:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H4"/></svg>',trash:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',wrench:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',car:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16v-5l2-5h10l2 5v5"/><path d="M3 16h18v3H3zM6 19v2M18 19v2"/></svg>',check:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>',key:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>',alert:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>'};</script>
+</head>
+<body>
+
+<!-- Modal ────────────────────────────────────────────────────────── -->
+<div class="modal-bg hidden" id="modal-bg">
+  <div class="modal">
+    <div class="modal-icon"  id="modal-icon"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-msg"   id="modal-msg"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" id="modal-cancel">取消</button>
+      <button class="modal-ok"     id="modal-ok">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast ────────────────────────────────────────────────────────── -->
+<div id="toast-wrap"></div>
+
+<!-- Login ────────────────────────────────────────────────────────── -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">P</div>
+    <div class="login-title">雲端載重智慧車位偵測</div>
+    <div class="login-sub" id="login-sub">請以管理員身分登入</div>
+    <div class="login-field">
+      <label class="login-label" for="login-email">電子郵件</label>
+      <input type="email" id="login-email" class="login-input" placeholder="admin@example.com" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label class="login-label" for="login-pw">密碼</label>
+      <input type="password" id="login-pw" class="login-input" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="login-field" id="login-pw2-field">
+      <label class="login-label" for="login-pw2">再次輸入密碼</label>
+      <input type="password" id="login-pw2" class="login-input" placeholder="至少 6 個字元" autocomplete="new-password">
+    </div>
+    <button id="login-btn" class="login-btn">登入</button>
+    <div class="login-switch"><span id="login-switch-text">還沒有帳號？</span><button type="button" id="login-switch">註冊新帳號</button></div>
+    <div class="login-switch"><button type="button" id="login-forgot">忘記密碼？</button></div>
+    <div id="login-error"></div>
+    <div class="login-switch"><button type="button" id="login-resend">重新寄驗證信</button></div>
+  </div>
+</div>
+
+<!-- Sidebar overlay (mobile) ─────────────────────────────────────── -->
+<div id="sb-overlay"></div>
+
+<!-- App Shell ────────────────────────────────────────────────────── -->
+<div class="app-shell">
+
+  <!-- Sidebar ──────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sb-logo-section">
+      <div class="sb-logo-icon">P</div>
+      <div class="sb-logo-text">
+        <div class="sb-logo-title">智慧車位偵測</div>
+        <div class="sb-logo-sub">管理者後台</div>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-section-label">導覽</div>
+      <div class="sb-item active" data-tab="overview">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+        總覽
+      </div>
+      <div class="sb-item" data-tab="events">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="10" y2="12"/></svg>
+        事件紀錄
+        <span class="sb-badge" id="sb-events-badge"></span>
+      </div>
+      <div class="sb-item" data-tab="map">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="3" width="6" height="10" rx="1.5"/><rect x="9" y="3" width="6" height="10" rx="1.5"/><line x1="7.5" y1="6" x2="8.5" y2="6"/><line x1="7.5" y1="8" x2="8.5" y2="8"/><line x1="7.5" y1="10" x2="8.5" y2="10"/></svg>
+        平面圖
+      </div>
+      <a class="sb-item" id="sb-owner" href="/owner/">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.5"/><path d="M1.5 14c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5"/><path d="M12.5 6.5v4M10.5 8.5h4"/></svg>
+        權限管理
+      </a>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="sb-conn-row">
+        <div class="sb-conn-dot offline" id="conn-dot"></div>
+        <span class="sb-conn-text" id="conn-text">連線中…</span>
+      </div>
+      <div class="sb-toggle-row">
+        <button class="sb-toggle-btn" id="btn-dark" title="深色模式">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a1 1 0 0 1 1 1v.5a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm0 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm6-2a1 1 0 0 1 0 2h-.5a1 1 0 0 1 0-2H14zm-11 0a1 1 0 0 1 0 2H2.5a1 1 0 0 1 0-2H3zm9.95-5.536a1 1 0 0 1 0 1.414l-.354.354a1 1 0 1 1-1.414-1.414l.354-.354a1 1 0 0 1 1.414 0zM4.404 12.01a1 1 0 0 1 0 1.414l-.354.354a1 1 0 1 1-1.414-1.414l.354-.354a1 1 0 0 1 1.414 0zM14 8a1 1 0 0 1-1 1h-.5a1 1 0 0 1 0-2H13a1 1 0 0 1 1 1zM3 8a1 1 0 0 1-1 1H1.5a1 1 0 0 1 0-2H2a1 1 0 0 1 1 1zm9.95 3.536a1 1 0 0 1-1.414 1.414l-.354-.354a1 1 0 1 1 1.414-1.414l.354.354zM4.404 3.99a1 1 0 0 1-1.414 1.414l-.354-.354A1 1 0 1 1 4.05 3.636l.354.354zM8 13a1 1 0 0 1 1 1v.5a1 1 0 0 1-2 0V14a1 1 0 0 1 1-1z"/></svg>
+          外觀
+        </button>
+        <button class="sb-toggle-btn" id="btn-sound" title="提示音效">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.502 1.06a.5.5 0 0 1 .498.048L13.5 3.85V3.5A1.5 1.5 0 0 1 15 5v6a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 2 11V5a1.5 1.5 0 0 1 1.5-1.5H5V3.85L9.004 1.108a.5.5 0 0 1 .498-.048zM5 4.5H3.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5H5V4.5zm1 7h4v-7H6v7zm5 0h1.5a.5.5 0 0 0 .5-.5V5a.5.5 0 0 0-.5-.5H11v7zM9.5 2.353L6 4.283V4.5h4v-.217L9.5 2.353z"/></svg>
+          音效
+        </button>
+      </div>
+      <div class="sb-user-row">
+        <div class="sb-user-avatar" id="sb-user-avatar">—</div>
+        <span class="sb-user-email" id="user-email"></span>
+        <button class="sb-logout-btn" id="btn-logout" style="display:none">登出</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main area ────────────────────────────────────────────────── -->
+  <div class="main-wrap">
+
+    <!-- Top bar ────────────────────────────────────────────────── -->
+    <header class="top-bar">
+      <button id="btn-menu" aria-label="開啟選單">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="2" y1="4" x2="14" y2="4"/>
+          <line x1="2" y1="8" x2="14" y2="8"/>
+          <line x1="2" y1="12" x2="14" y2="12"/>
+        </svg>
+      </button>
+      <span id="page-title">總覽</span>
+      <div class="top-bar-right">
+        <div class="top-live-dot" id="top-live-dot" style="display:none"></div>
+        <span id="last-sync">—</span>
+      </div>
+    </header>
+
+    <!-- Content ──────────────────────────────────────────────── -->
+    <div class="content">
+      <div id="device-banner" class="banner"></div>
+      <div id="full-banner"  class="banner"></div>
+      <div id="alert-banner" class="banner"></div>
+
+      <!-- 總覽 ────────────────────────────────────────────────── -->
+      <div class="section active" id="tab-overview">
+        <!-- KPI -->
+        <div class="kpi-grid">
+          <!-- Ring card -->
+          <div class="ring-card">
+            <div class="ring-svg-wrap">
+              <svg viewBox="0 0 100 100">
+                <circle id="ring-track" cx="50" cy="50" r="40"/>
+                <circle id="ring-circle" cx="50" cy="50" r="40"
+                  stroke="#2A9D8F" stroke-dasharray="0 251.33"/>
+              </svg>
+              <div class="ring-center">
+                <div id="ring-pct">0%</div>
+                <div class="ring-pct-lbl">使用</div>
+              </div>
+            </div>
+            <div class="ring-info">
+              <div class="ring-free-num" id="kpi-free">–</div>
+              <div class="ring-free-lbl">可用空位</div>
+              <div class="ring-sub-row">
+                <div class="ring-sub-item">
+                  <span class="ring-sub-dot" style="background:var(--free)"></span>
+                  室內 <span id="ring-indoor">–</span>
+                </div>
+                <div class="ring-sub-item">
+                  <span class="ring-sub-dot" style="background:var(--brand)"></span>
+                  室外 <span id="ring-outdoor">–</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Stat cards -->
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <div>
+                <div class="kpi-val kv-ink" id="kpi-indoor">–</div>
+                <div class="kpi-lbl">室內空位</div>
+              </div>
+              <div class="kpi-icon ki-gray"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg></div>
+            </div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-indoor-bar" style="width:0%"></div></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <div>
+                <div class="kpi-val kv-ink" id="kpi-outdoor">–</div>
+                <div class="kpi-lbl">室外空位</div>
+              </div>
+              <div class="kpi-icon ki-gray"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg></div>
+            </div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-outdoor-bar" style="width:0%"></div></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-top">
+              <div>
+                <div class="kpi-val kv-amber" id="kpi-pct">–</div>
+                <div class="kpi-lbl">整體使用率</div>
+              </div>
+              <div class="kpi-icon ki-amber"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20V11M11 20V5M16 20v-6"/></svg></div>
+            </div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="ai-row">
+          <button class="ai-btn" id="ai-btn" type="button">AI 摘要</button><button class="ai-btn ai-btn2" id="ai-report" type="button">AI 日報</button>
+          <div class="ai-ans" id="ai-ans" aria-live="polite"></div>
+          <form class="aiAsk" id="ai-ask"><input id="ai-q" maxlength="200" placeholder="什麼都能問，例如：今天哪格進出最頻繁？" enterkeyhint="send" autocomplete="off" aria-label="問 AI 問題"><button type="button" class="aiMic" id="ai-mic" aria-label="語音提問"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="submit" id="ai-ask-btn" aria-label="送出問題"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+          <div class="aiChips" id="ai-chips"></div>
+        </div>
+
+        <!-- Chart -->
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="panel-title">使用率趨勢</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="chart-range-btns">
+                <button class="chart-range-btn active" data-range="24">24 小時</button>
+                <button class="chart-range-btn" data-range="72">3 天</button>
+                <button class="chart-range-btn" data-range="168">7 天</button>
+              </div>
+              <span class="panel-meta" style="display:flex;align-items:center;gap:5px">
+                <span class="legend-dash"></span>75% 警戒線
+              </span>
+            </div>
+          </div>
+          <canvas id="usage-chart"></canvas>
+        </div>
+
+        <!-- Spots -->
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="panel-title">車位即時狀態</span>
+          </div>
+          <div class="spots-layout">
+            <div>
+              <div class="zone-hd">
+                <span class="zone-icon"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg></span>
+                <span class="zone-name">室內車位</span>
+                <span class="zone-badge" id="indoor-count">– / 4 空</span>
+              </div>
+              <div class="spots-grid" id="grid-indoor"></div>
+            </div>
+            <div class="zone-sep"></div>
+            <div>
+              <div class="zone-hd">
+                <span class="zone-icon"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg></span>
+                <span class="zone-name">室外車位</span>
+                <span class="zone-badge" id="outdoor-count">– / 4 空</span>
+              </div>
+              <div class="spots-grid" id="grid-outdoor"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 事件紀錄 ──────────────────────────────────────────────── -->
+      <div class="section" id="tab-events">
+        <div class="log-analytics">
+          <div class="log-an-card">
+            <div class="log-an-val" id="log-an-today">0</div>
+            <div class="log-an-lbl">今日事件數</div>
+          </div>
+          <div class="log-an-card">
+            <div class="log-an-val" id="log-an-total">0</div>
+            <div class="log-an-lbl">近 7 天總計</div>
+          </div>
+          <div class="log-an-card">
+            <div class="log-an-val" id="log-an-top">—</div>
+            <div class="log-an-lbl">最活躍車位</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd"><span class="panel-title">進場熱度（近 7 天）</span><span class="panel-meta" id="heat-meta"></span></div>
+          <div class="heat" id="heat"></div>
+        </div>
+        <div class="log-hd">
+          <span class="log-title">事件紀錄</span>
+          <div class="log-toolbar">
+            <span class="log-today" id="log-today">今日 0 筆</span>
+            <details class="log-spots" id="log-filter-spot">
+              <summary class="log-sel" id="log-spot-sum">所有車位 ▾</summary>
+              <div class="log-spots-pop">
+                <label><input type="checkbox" value="I1">I1</label><label><input type="checkbox" value="I2">I2</label>
+                <label><input type="checkbox" value="I3">I3</label><label><input type="checkbox" value="I4">I4</label>
+                <label><input type="checkbox" value="O1">O1</label><label><input type="checkbox" value="O2">O2</label>
+                <label><input type="checkbox" value="O3">O3</label><label><input type="checkbox" value="O4">O4</label>
+                <div class="q"><button type="button" data-q="I">室內</button><button type="button" data-q="O">室外</button><button type="button" data-q="">全部</button></div>
+              </div>
+            </details>
+            <select class="log-sel" id="log-filter-type">
+              <option value="">所有變化</option>
+              <option value="taken">有車</option>
+              <option value="free">空位</option>
+              <option value="maint">維修中／恢復</option>
+            </select>
+            <button class="btn-clear" id="btn-clear-log">清除</button>
+            <button class="btn-export" id="btn-export"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg> 匯出 CSV</button>
+          </div>
+        </div>
+        <div class="log-wrap">
+          <table class="log-table">
+            <thead><tr><th>時間</th><th>車位</th><th>變化後</th><th>變化前</th></tr></thead>
+            <tbody id="log-tbody">
+              <tr><td colspan="4" class="log-empty">尚無事件，等待車位變化…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 平面圖 ────────────────────────────────────────────────── -->
+      <div class="section" id="tab-map">
+        <div class="section-hd">
+          <div>
+            <div class="section-hd-title">停車場平面圖</div>
+            <div class="section-hd-sub">即時車位俯視示意圖，點擊空格可切換狀態</div>
+          </div>
+        </div>
+        <div class="floor-plan">
+          <div class="fp-zone">
+            <div class="fp-zone-hd">
+              <span><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg></span>
+              <span class="fp-zone-name">室內停車區</span>
+              <span class="fp-zone-badge" id="map-indoor-count">– / 4 空</span>
+            </div>
+            <div class="fp-spots-row" id="map-grid-indoor"></div>
+          </div>
+          <div class="fp-lane">
+            <div class="fp-lane-line"></div>
+            <span class="fp-lane-lbl">行車通道</span>
+            <div class="fp-lane-line"></div>
+          </div>
+          <div class="fp-zone">
+            <div class="fp-zone-hd">
+              <span><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg></span>
+              <span class="fp-zone-name">室外停車區</span>
+              <span class="fp-zone-badge" id="map-outdoor-count">– / 4 空</span>
+            </div>
+            <div class="fp-spots-row" id="map-grid-outdoor"></div>
+          </div>
+          <div class="fp-entrance">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 13V3M3 8l5-5 5 5"/></svg>
+            出入口
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8l5 5 5-5"/></svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- .main-wrap -->
+</div><!-- .app-shell -->
+
+<nav id="bottom-nav">
+  <button class="bn-item active" data-tab="overview">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+    <span class="bn-item-label">總覽</span>
+  </button>
+  <button class="bn-item" data-tab="events">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="10" y2="12"/></svg>
+    <span class="bn-item-label">事件</span>
+    <span class="bn-badge" id="bn-events-badge"></span>
+  </button>
+  <button class="bn-item" data-tab="map">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1" y="3" width="6" height="10" rx="1.5"/><rect x="9" y="3" width="6" height="10" rx="1.5"/><line x1="7.5" y1="6" x2="8.5" y2="6"/><line x1="7.5" y1="8" x2="8.5" y2="8"/><line x1="7.5" y1="10" x2="8.5" y2="10"/></svg>
+    <span class="bn-item-label">平面圖</span>
+  </button>
+</nav>
+
+<script type="module">
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js';
+import { getDatabase, ref, onValue, set, remove, update, query, orderByChild, startAt, endAt, get, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut,
+         sendEmailVerification, sendPasswordResetEmail }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-app-check.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCj1Jeq_Q8mKaLRuCIZU9YocuNs7dMK2CM",
+  authDomain:        "smart-parking-8df51.firebaseapp.com",
+  databaseURL:       "https://smart-parking-8df51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "smart-parking-8df51",
+  storageBucket:     "smart-parking-8df51.firebasestorage.app",
+  messagingSenderId: "982428772229",
+  appId:             "1:982428772229:web:a13805dd604f65198d06ec",
+  measurementId:     "G-3B21BLV5MJ"
+};
+
+const app  = initializeApp(firebaseConfig);
+// App Check（reCAPTCHA Enterprise）：2026/11/2 起 Firebase AI Logic 強制要求
+// Demo 裝置可在 localStorage 放偵錯符記（不寫在程式裡）：localStorage.appCheckDebugToken = '<符記>'
+try { const t = localStorage.getItem('appCheckDebugToken'); if (t) self.FIREBASE_APPCHECK_DEBUG_TOKEN = t; } catch (e) {}
+initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6LdUZv4tAAAAAD22iprZ1eIdtkgLrvGzBBfOIijp'), isTokenAutoRefreshEnabled: true });
+const db   = getDatabase(app);
+const auth = getAuth(app);
+
+const INDOOR  = ['indoor1','indoor2','indoor3','indoor4'];
+const OUTDOOR = ['outdoor1','outdoor2','outdoor3','outdoor4'];
+const ALL     = [...INDOOR, ...OUTDOOR];
+const label   = k => (k.startsWith('indoor') ? 'I' : 'O') + k.slice(-1);
+
+const S = {
+  occupied:     Object.fromEntries(ALL.map(k=>[k,false])),
+  disabled:     Object.fromEntries(ALL.map(k=>[k,false])),
+  since:        Object.fromEntries(ALL.map(k=>[k,Date.now()])),
+  loaded:       false,
+  wasAllFull:   false,
+  eventLog:     [],
+  maintLog:     [],     // 維修紀錄：maintLog/<key>_<秒> = {ts, key, label, on}（只有登入的管理者能讀寫）
+  changeTimes:  Object.fromEntries(ALL.map(k=>[k,[]])),
+  unstable:     Object.fromEntries(ALL.map(k=>[k,false])),
+  spotHistory:  Object.fromEntries(ALL.map(k=>[k,[]])),
+  reserve:      {},     // 使用者保留：reserve/<key> = {until, by}
+  // 預留給之後新增的硬體（目前 ESP32 沒上傳，有資料 AI 才會用）：
+  // extra＝parking/ 裡畫面還沒設定的新車位、weight＝sensors/<key> 重量、thr＝admin/weightThreshold、dev＝device/ 其他欄位
+  hw:           { extra: {}, weight: {}, thr: null, dev: {} },
+};
+const DAY_MS   = 24 * 3600 * 1000;
+const KEEP_MS  = 7 * DAY_MS;   // 事件紀錄與使用率趨勢保留 7 天
+const PRUNE_MS = 30 * DAY_MS;  // 資料庫只留 30 天，更舊的在管理者登入時自動刪除
+let currentUser    = null;
+let lastSyncTs     = null;
+let dbOnline       = false;
+let chartRange     = 24;   // 小時
+const flashKeys    = new Set();
+const mapFlashKeys = new Set();
+const logFilter    = { spots: new Set(), type: '' };   // spots 空集合 = 所有車位
+let   maintUnsub   = null;
+let   devUnsub     = null;   // device/ 整個節點需要登入才能讀
+// 權限：業主固定信箱＋業主在 /owner/ 授權的 access/<信箱把 . 換成 ,> = {role: owner|admin|custom, perms}
+const OWNER_EMAIL  = 'lixiangsu6@gmail.com';
+const ekey         = e => e.toLowerCase().replaceAll('.', ',');
+const PERMS        = ['parking', 'maint', 'export', 'clear'];
+let   myAccess     = null;
+let   accUnsub     = null;
+let   expTimer     = null;   // 授權到期時自動登出
+const ROLE_NAME    = { owner: '業主', admin: '管理者', custom: '自訂權限' };
+const can = p => !!myAccess && (myAccess.role === 'owner' || myAccess.role === 'admin' || !!(myAccess.perms && myAccess.perms[p]));
+function applyAccess() {
+  document.body.classList.toggle('is-owner', !!myAccess && myAccess.role === 'owner');
+  PERMS.forEach(p => document.body.classList.toggle('no-' + p, !can(p)));
+}
+// 按鈕藏起來之外再擋一次（權限可能在畫面開著時被業主改掉）
+function denied(p) {
+  if (!currentUser) { toast('請先登入才能操作', 'err'); return true; }
+  if (!can(p)) { toast('你沒有這個權限，請聯絡業主', 'err'); return true; }
+  return false;
+}
+let   devSeen      = null;   // ESP32 最後回報時間（device/lastSeen，伺服器時間）
+const DEV_TIMEOUT  = 10000;  // 超過 10 秒沒回報＝感測器離線
+let   srvSkew      = 0;   // 伺服器時間 − 本機時間（.info/serverTimeOffset）
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+let _modalResolve = null;
+function showModal(title, msg, { okLabel='確認', danger=false, icon='' } = {}) {
+  return new Promise(resolve => {
+    _modalResolve = resolve;
+    const iconEl = document.getElementById('modal-icon');
+    iconEl.innerHTML     = (window.ICON && ICON[icon]) || '';
+    iconEl.style.display = icon ? '' : 'none';
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-msg').textContent   = msg;
+    const okBtn = document.getElementById('modal-ok');
+    okBtn.textContent = okLabel;
+    okBtn.className   = 'modal-ok' + (danger ? ' danger' : '');
+    document.getElementById('modal-bg').classList.remove('hidden');
+  });
+}
+document.getElementById('modal-ok').addEventListener('click', () => {
+  document.getElementById('modal-bg').classList.add('hidden');
+  if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
+});
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal-bg').classList.add('hidden');
+  if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
+});
+document.getElementById('modal-bg').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('modal-bg').classList.add('hidden');
+    if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
+  }
+});
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+function toast(msg, type = 'info') {
+  const wrap = document.getElementById('toast-wrap');
+  const el   = document.createElement('div');
+  el.className   = `toast toast-${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 3200);
+}
+
+/* ── Dark mode ──────────────────────────────────────────────────── */
+let darkMode = localStorage.getItem('dark') === '1';
+applyDark();
+document.getElementById('btn-dark').addEventListener('click', () => {
+  darkMode = !darkMode;
+  localStorage.setItem('dark', darkMode ? '1' : '0');
+  applyDark(); drawChart();
+});
+function applyDark() {
+  document.body.classList.toggle('dark', darkMode);
+  document.getElementById('btn-dark').classList.toggle('active', darkMode);
+}
+
+/* ── Sound ──────────────────────────────────────────────────────── */
+let soundOn = false;
+const sBtn = document.getElementById('btn-sound');
+sBtn.addEventListener('click', () => {
+  soundOn = !soundOn;
+  sBtn.classList.toggle('active', soundOn);
+});
+function beep(freq, dur = 0.35) {
+  if (!soundOn) return;
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+/* ── Mobile sidebar ─────────────────────────────────────────────── */
+const sidebar   = document.getElementById('sidebar');
+const sbOverlay = document.getElementById('sb-overlay');
+function openSidebar()  { sidebar.classList.add('open'); sbOverlay.classList.add('show'); }
+function closeSidebar() { sidebar.classList.remove('open'); sbOverlay.classList.remove('show'); }
+document.getElementById('btn-menu').addEventListener('click', () => {
+  sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+sbOverlay.addEventListener('click', closeSidebar);
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+function parseOccupied(v) {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string')  return v === '1' || v.toLowerCase() === 'true';
+  if (typeof v === 'number')  return v === 1;
+  if (v && typeof v === 'object') return v.occupied === true;
+  return false;
+}
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('zh-TW', { hour12: false });
+}
+function fmtShort(ts) {   // 10/17 13:00
+  const d = new Date(ts), p = n => String(n).padStart(2,'0');
+  return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtDateTime(ts) {  // 10/17 13:05:09
+  return `${fmtShort(ts)}:${String(new Date(ts).getSeconds()).padStart(2,'0')}`;
+}
+// 保留中＝使用者保留且未過期、沒車、沒維修（同使用者網頁）；空位不含維修中與保留中
+const heldUntil = k => { const r = S.reserve[k]; return r && r.until > Date.now() + srvSkew && !S.occupied[k] && !S.disabled[k] ? r.until : 0; };
+const isFree    = k => !S.occupied[k] && !S.disabled[k] && !heldUntil(k);
+const usableOf  = keys => keys.filter(k => !S.disabled[k]);
+const usePct    = keys => { const u = usableOf(keys); return u.length ? Math.round(u.filter(k => S.occupied[k]).length / u.length * 100) : 0; };
+/* 由事件紀錄重建使用率：從目前狀態往回推，再依時間區段計算平均使用率 */
+function usageSeries(hours) {
+  if (!S.loaded) return [];
+  const now  = Date.now(), T0 = now - hours * 3600000;
+  const step = hours <= 24 ? 1800000 : hours <= 72 ? 3600000 : 7200000;
+  const ev   = S.eventLog.filter(e => e.ts >= T0 && e.ts <= now && ALL.includes(e.key)).sort((a,b) => a.ts - b.ts);
+  if (!ev.length) return [];
+  const st = { ...S.occupied };
+  for (let i = ev.length - 1; i >= 0; i--) st[ev[i].key] = ev[i].prev;
+  const occN  = () => ALL.filter(k => st[k]).length;
+  const start = Math.max(T0, Math.floor(ev[0].ts / step) * step);
+  const out = [];
+  let i = 0;
+  for (let b = start; b < now; b += step) {
+    const end = Math.min(b + step, now);
+    let acc = 0, cur = b;
+    while (i < ev.length && ev[i].ts < end) {
+      acc += occN() * (ev[i].ts - cur);
+      cur = Math.max(cur, ev[i].ts); st[ev[i].key] = ev[i].occ; i++;
+    }
+    acc += occN() * (end - cur);
+    out.push({ ts: b, pct: Math.round(acc / (end - b) / ALL.length * 100) });
+  }
+  return out;
+}
+function authErr(code) {
+  if (['auth/user-not-found','auth/wrong-password','auth/invalid-credential'].includes(code))
+    return '帳號或密碼錯誤';
+  if (code === 'auth/too-many-requests') return '嘗試次數過多，請稍後再試';
+  if (code === 'auth/invalid-email')     return '電子郵件格式不正確';
+  if (code === 'auth/email-already-in-use') return '這個電子郵件已經註冊過，請直接登入';
+  if (code === 'auth/weak-password')     return '密碼至少要 6 個字元';
+  if (code === 'auth/operation-not-allowed') return '目前未開放註冊';
+  if (code === 'auth/missing-email')     return '請輸入電子郵件';
+  return (regMode ? '註冊失敗：' : '登入失敗：') + code;
+}
+
+/* ── Auth ───────────────────────────────────────────────────────── */
+// 刪除 30 天前的事件與維修紀錄（一次 update 多筆設成 null）
+async function pruneOld() {
+  const cutoff = Date.now() + srvSkew - PRUNE_MS;
+  for (const path of ['events', 'maintLog']) {
+    try {
+      const snap = await get(query(ref(db, path), orderByChild('ts'), endAt(cutoff)));
+      const del = {};
+      snap.forEach(c => { del[`${path}/${c.key}`] = null; });
+      if (Object.keys(del).length) await update(ref(db), del);
+    } catch (err) { console.error('prune', path, err); }
+  }
+}
+
+// 信箱未驗證不能進後台；註冊／重寄驗證信途中（authHold）由按鈕流程自己登出
+let authHold = false;
+let loginNotice = null;   // 登出後要顯示在登入卡的訊息 { text, ok, resend }
+function showNotice(n) {
+  const el = document.getElementById('login-error');
+  el.textContent = n ? n.text : '';
+  el.classList.toggle('ok', !!(n && n.ok));
+  document.getElementById('login-resend').style.display = n && n.resend ? 'inline' : 'none';
+}
+onAuthStateChanged(auth, user => {
+  if (user && !user.emailVerified) {
+    if (!authHold) { loginNotice = { text: '請先完成信箱驗證', resend: true }; signOut(auth); }
+    return;
+  }
+  if (accUnsub) { accUnsub(); accUnsub = null; }
+  clearTimeout(expTimer);
+  if (!user) { showSession(null); return; }
+  // 業主有授權才進後台；權限被改會即時套用，被移除就登出
+  const isMain = user.email.toLowerCase() === OWNER_EMAIL;
+  accUnsub = onValue(ref(db, `access/${ekey(user.email)}`), snap => {
+    const a = isMain ? { role: 'owner' } : snap.val();
+    if (!a || !a.role) {
+      loginNotice = { text: currentUser ? '你的權限已被業主移除' : '這個帳號還沒有被業主授權，請聯絡業主開通' };
+      signOut(auth); return;
+    }
+    // 到期日用伺服器時間判斷（同資料庫規則）
+    clearTimeout(expTimer);
+    if (typeof a.expires === 'number') {
+      const left = a.expires - (Date.now() + srvSkew);
+      if (left <= 0) { loginNotice = { text: '你的授權已到期，請聯絡業主' }; signOut(auth); return; }
+      if (left < 2 ** 31 - 1) expTimer = setTimeout(() => { loginNotice = { text: '你的授權已到期，請聯絡業主' }; signOut(auth); }, left);
+    }
+    myAccess = a; applyAccess();
+    if (currentUser !== user) {
+      showSession(user);   // 先進後台：下面的寫入會同步觸發這個監聽，currentUser 已設好就不會重進
+      if (!isMain) set(ref(db, `access/${ekey(user.email)}/seen`), serverTimestamp()).catch(() => {});   // 給業主頁看最近登入
+    }
+  }, err => { loginNotice = { text: '無法讀取權限：' + err.code }; signOut(auth); });
+});
+function showSession(user) {
+  currentUser = user;
+  const overlay    = document.getElementById('login-overlay');
+  const emailEl    = document.getElementById('user-email');
+  const avatarEl   = document.getElementById('sb-user-avatar');
+  const logoutEl   = document.getElementById('btn-logout');
+  if (user) {
+    overlay.classList.add('hidden');
+    emailEl.textContent  = user.email;
+    const initials = user.email ? user.email[0].toUpperCase() : '?';
+    avatarEl.textContent = initials;
+    logoutEl.style.display = '';
+    document.getElementById('top-live-dot').style.display = '';
+    if (!maintUnsub) maintUnsub = onValue(query(ref(db, 'maintLog'), orderByChild('ts'), startAt(Date.now() - KEEP_MS)), snap => {
+      const items = [];
+      snap.forEach(child => { const v = child.val(); items.push({ ts: v.ts, key: v.key, label: v.label, maint: true, on: !!v.on }); });
+      S.maintLog = items.reverse();
+      renderLog();
+    }, err => console.error('maintLog', err));
+    // 預留：ESP32 之後在 device/ 加的其他欄位（溫度、電壓…），只取前 5 個簡單值給 AI 問答參考
+    if (!devUnsub) devUnsub = onValue(ref(db, 'device'), snap => {
+      S.hw.dev = Object.fromEntries(Object.entries(snap.val() || {})
+        .filter(([k, v]) => k !== 'lastSeen' && ['number', 'string', 'boolean'].includes(typeof v)).slice(0, 5));
+    }, () => { S.hw.dev = {}; });
+    pruneOld();
+    toast(`登入成功，歡迎回來（${myAccess && ROLE_NAME[myAccess.role] || ''}）`, 'ok');
+    emailEl.title = myAccess && myAccess.role === 'owner' && user.email.toLowerCase() !== OWNER_EMAIL ? '共同業主' : (myAccess && ROLE_NAME[myAccess.role]) || '';
+  } else {
+    overlay.classList.remove('hidden');
+    emailEl.textContent    = '';
+    avatarEl.textContent   = '—';
+    logoutEl.style.display = 'none';
+    document.getElementById('top-live-dot').style.display = 'none';
+    if (maintUnsub) { maintUnsub(); maintUnsub = null; }
+    if (devUnsub) { devUnsub(); devUnsub = null; }
+    S.maintLog = []; S.hw.dev = {};
+    myAccess = null; applyAccess();
+    setRegMode(false);
+    showNotice(loginNotice); loginNotice = null;
+    document.getElementById('login-btn').disabled = false;
+  }
+}
+// 登入／註冊切換（註冊後寄驗證信並登出，驗證完才能登入）
+let regMode = false;
+function setRegMode(on) {
+  regMode = on;
+  document.querySelector('.login-card').classList.toggle('reg', on);
+  document.getElementById('login-sub').textContent         = on ? '建立管理員帳號' : '請以管理員身分登入';
+  document.getElementById('login-btn').textContent         = on ? '註冊' : '登入';
+  document.getElementById('login-switch-text').textContent = on ? '已經有帳號？' : '還沒有帳號？';
+  document.getElementById('login-switch').textContent      = on ? '返回登入' : '註冊新帳號';
+  document.getElementById('login-pw').autocomplete         = on ? 'new-password' : 'current-password';
+  document.getElementById('login-pw2').value = '';
+  showNotice(null);
+}
+document.getElementById('login-switch').addEventListener('click', () => setRegMode(!regMode));
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-btn');
+  const label = regMode ? '註冊' : '登入';
+  showNotice(null);
+  if (!email || !pw) { errEl.textContent = '請輸入帳號和密碼'; return; }
+  if (regMode && pw.length < 6) { errEl.textContent = '密碼至少要 6 個字元'; return; }
+  if (regMode && pw !== document.getElementById('login-pw2').value) { errEl.textContent = '兩次輸入的密碼不一樣'; return; }
+  btn.disabled = true; btn.textContent = label + '中…';
+  try {
+    if (regMode) {
+      authHold = true;
+      const cred = await createUserWithEmailAndPassword(auth, email, pw);
+      try {
+        await sendEmailVerification(cred.user);
+        loginNotice = { text: '驗證信已寄出，請到信箱點連結，並請業主授權這個信箱', ok: true };
+      } catch (e) {
+        loginNotice = { text: '帳號已建立，但驗證信寄送失敗：' + authErr(e.code), resend: true };
+      }
+      await signOut(auth);
+    } else await signInWithEmailAndPassword(auth, email, pw);
+  } catch(e) {
+    errEl.textContent = authErr(e.code);
+    btn.disabled = false; btn.textContent = label;
+  } finally { authHold = false; }
+});
+// 重新寄驗證信：用輸入的帳密暫時登入、寄信、再登出
+document.getElementById('login-resend').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  if (!email || !pw) { showNotice({ text: '請輸入帳號和密碼後再按「重新寄驗證信」', resend: true }); return; }
+  authHold = true;
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, pw);
+    if (!cred.user.emailVerified) {   // 已驗證的話 onAuthStateChanged 會直接進後台
+      await sendEmailVerification(cred.user);
+      loginNotice = { text: '驗證信已重新寄出，請到信箱點連結', ok: true };
+      await signOut(auth);
+    }
+  } catch (e) {
+    showNotice({ text: authErr(e.code), resend: true });
+  } finally { authHold = false; }
+});
+document.getElementById('login-forgot').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { showNotice({ text: '請先在上方輸入電子郵件，再按「忘記密碼？」' }); return; }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showNotice({ text: '已寄出重設信，請到信箱收信', ok: true });
+  } catch (e) {
+    showNotice({ text: e.code === 'auth/user-not-found' ? '查無此電子郵件' : authErr(e.code) });
+  }
+});
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  const ok = await showModal('確認登出', '登出後需重新輸入帳號密碼才能操作。', { okLabel:'登出', danger:true, icon:'logout' });
+  if (ok) await signOut(auth);
+});
+document.getElementById('login-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-pw').focus();
+});
+document.getElementById('login-pw').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (regMode) document.getElementById('login-pw2').focus();
+  else document.getElementById('login-btn').click();
+});
+document.getElementById('login-pw2').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+});
+
+// ── AI 助理共用元件（使用者網頁、管理網頁相同）─────────────────────────
+// 免費額度每個模型分開算：依序嘗試，前一個失敗（額度用完／逾時）就換下一個
+const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
+const AI_TTL = 6 * 3600000;   // 共用快取 6 小時內有效
+const AI_VARIANTS = 3;        // 每個狀態最多存 3 種說法，每次按輪流換
+const AI_FAIL = {text: "暫時無法回答", cached: true};
+const fnv = str => { let h = 0x811c9dc5; for (const c of str) { h ^= c.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
+// 時間分段，資料文字才不會每分鐘都變（共用快取才有用）
+const aiDur = ms => ms < 600000 ? "不到 10 分鐘" : ms < 1800000 ? "10～30 分鐘" : ms < 3600000 ? "半小時～1 小時" : ms < 3 * 3600000 ? "1～3 小時" : "3 小時以上";
+const aiPeriod = () => { const h = new Date().getHours(); return h < 5 ? "深夜" : h < 11 ? "早上" : h < 14 ? "中午" : h < 18 ? "下午" : h < 23 ? "晚上" : "深夜"; };
+const aiPickVariant = c => { const o = [...Array(AI_VARIANTS).keys()].filter(i => i !== c.n); return o[Math.floor(Math.random() * o.length)]; };
+// 串流產生：onText 收到目前累積的文字；換模型前會送空字串讓畫面回到思考中
+// 逾時含 App Check（reCAPTCHA）驗證時間，手機慢網路時第一個模型給 25 秒；三個都很快失敗時再試一輪
+async function aiGenerate(ai, getGenerativeModel, prompt, onText){
+  const t0 = Date.now();
+  for (let round = 0; round < 2; round++) {
+    if (round) { if (Date.now() - t0 > 20000) break; await new Promise(r => setTimeout(r, 1000)); }
+    for (const [i, m] of AI_MODELS.entries()) {
+      const ms = i ? 15000 : 25000; let live = true, acc = "";
+      try {
+        const run = (async () => {
+          const r = await getGenerativeModel(ai, { model: m }, { timeout: ms }).generateContentStream(prompt);
+          for await (const ch of r.stream) { if (!live) return ""; acc += ch.text(); if (acc.trim()) onText(acc.trim()); }
+          return acc.trim();
+        })();
+        const text = await Promise.race([run, new Promise((_, no) => setTimeout(() => no(new Error("串流逾時")), ms + 15000))]);
+        if (text) return text;
+      } catch (e) { console.warn(m, e); } finally { live = false; }
+      if (acc) onText("");
+    }
+  }
+  return "";
+}
+// 對話框：思考中跳動圓點；回答（串流或逐字）出現，車位名稱變成小標籤；可唸出回答
+// 問題列：多輪對話時顯示「延續前 N 句」與「↺ 新對話」
+function aiQLine(a, q, hist){
+  if (!q) return; const d = document.createElement("div"); d.className = "aiQ"; d.textContent = `你問：${q}`;
+  if (hist && hist.n) { const r = document.createElement("button"); r.type = "button"; r.className = "aiReset"; r.textContent = `延續前 ${hist.n} 句・↺ 新對話`; r.onclick = hist.reset; d.appendChild(r); }
+  a.appendChild(d);
+}
+function aiThinking(a, q, {hist, notice} = {}){
+  a.classList.add("think"); a.classList.toggle("notice", !!notice); a.textContent = ""; a._tw = (a._tw || 0) + 1; aiQLine(a, q, hist);
+  const d = document.createElement("div"); d.innerHTML = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>思考中…'; a.appendChild(d);
+}
+const aiSay = t => t.replace(/indoor([1-4])/g, "室內$1號").replace(/outdoor([1-4])/g, "室外$1號");
+function aiShow(a, text, {q, onSpot, typing, streaming, hist, notice} = {}){
+  a.classList.remove("think"); a.classList.toggle("notice", !!notice); a.textContent = ""; const tw = a._tw = (a._tw || 0) + 1; aiQLine(a, q, hist);
+  const body = document.createElement("div"); body.className = "aiBody" + (streaming ? " live" : ""); a.appendChild(body);
+  const nodes = [];
+  for (const s of text.split(/(indoor[1-4]|outdoor[1-4])/)) { if (!s) continue;
+    if (/^(indoor|outdoor)[1-4]$/.test(s)) { const c = document.createElement(onSpot ? "button" : "span"); c.className = "aiSpot"; c.textContent = s;
+      if (onSpot) { c.type = "button"; c.onclick = () => onSpot(s); } nodes.push([c, null]); }
+    else nodes.push([document.createTextNode(""), s]); }
+  const done = () => { if (streaming || !("speechSynthesis" in window) || text === AI_FAIL.text) return;
+    const sp = document.createElement("button"); sp.type = "button"; sp.className = "aiSpeak"; sp.setAttribute("aria-label", "唸出回答"); sp.innerHTML = ICON.speaker;
+    sp.onclick = () => { if (speechSynthesis.speaking) return speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(aiSay(text)); u.lang = "zh-TW"; u.rate = 1.05; speechSynthesis.speak(u); };
+    a.appendChild(sp); };
+  if (!typing || matchMedia("(prefers-reduced-motion: reduce)").matches) { nodes.forEach(([n, s]) => { if (s !== null) n.textContent = s; body.appendChild(n); }); return done(); }
+  let i = 0, j = 0;
+  const step = () => { if (tw !== a._tw) return; if (i >= nodes.length) return done(); const [n, s] = nodes[i];
+    if (j === 0) body.appendChild(n);
+    if (s === null || j >= s.length) { i++; j = 0; return step(); }
+    j = Math.min(s.length, j + 2); n.textContent = s.slice(0, j); setTimeout(step, 22); };
+  step();
+}
+// 快捷問題：點一下直接問
+function aiChips(box, qs, ask){ qs.forEach(q => { const b = document.createElement("button"); b.type = "button"; b.textContent = q; b.onclick = () => ask(q); box.appendChild(b); }); }
+// 語音提問：瀏覽器支援語音辨識才顯示麥克風（Chrome、Safari）；講完自動送出
+function aiVoice(btn, input, send){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return btn.remove();
+  let rec = null;
+  btn.onclick = () => {
+    if (rec) return rec.stop();
+    rec = new SR(); rec.lang = "zh-TW"; rec.interimResults = true; input.value = "";
+    rec.onresult = e => { input.value = [...e.results].map(r => r[0].transcript).join("").slice(0, 200); };
+    rec.onend = () => { btn.classList.remove("rec"); rec = null; if (input.value.trim()) send(); };
+    rec.onerror = e => console.warn("語音辨識", e.error);
+    try { rec.start(); btn.classList.add("rec"); } catch (e) { rec = null; console.warn(e); }
+  };
+}
+// 進場最多的時段（依事件紀錄的「有車」事件，按小時統計）
+const aiBusyHour = list => { const h = Array(24).fill(0); list.forEach(t => h[new Date(t).getHours()]++); const m = Math.max(...h);
+  return m ? `${h.indexOf(m)}～${h.indexOf(m) + 1} 點（進場 ${m} 次）` : "沒有紀錄"; };
+/* ── AI 摘要（Firebase AI Logic；金鑰由 Firebase 管理）──────────────── */
+// 預留：有重量資料和門檻時，重量判斷（≥ 門檻＝有車）和車位狀態不同就標記
+const aiWeightOff = k => { const w = S.hw.weight[k]; return S.hw.thr !== null && w !== undefined && !S.disabled[k] && (w >= S.hw.thr) !== S.occupied[k]; };
+const aiNewSpots = () => Object.keys(S.hw.extra);
+// 給 AI 的資料：時段、每格狀態與已停／已空／停用多久、感測器頻繁切換、重量不一致、使用率、
+// 今日進出次數與最頻繁的格子、今日最忙時段、新車位、感測器連線
+function aiData() {
+  const now = Date.now() + srvSkew, last = {};
+  S.eventLog.forEach(e => { if (!last[e.key] || e.ts > last[e.key].ts) last[e.key] = e; });
+  const st = k => S.disabled[k] ? '維修中' : S.occupied[k] ? '有車' : heldUntil(k) ? '保留中' : '空位';
+  const spot = k => { const s = st(k), e = last[k], m = S.maintLog.find(x => x.key === k);   // maintLog 新的在前
+    const dur = e && (s === '有車' || s === '空位') && !!e.occ === S.occupied[k] ? `，${s === '有車' ? '已停' : '已空'}${aiDur(now - e.ts)}`
+      : s === '維修中' && m && m.on ? `，停用${aiDur(now - m.ts)}` : '';
+    return `${k}:${s}${dur}${S.unstable[k] ? '，頻繁切換' : ''}${aiWeightOff(k) ? '，重量與狀態不一致' : ''}`; };
+  const usable = usableOf(ALL).length, taken = usableOf(ALL).filter(k => S.occupied[k]).length;
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const today = S.eventLog.filter(e => e.ts >= d0.getTime());
+  const top = ALL.map(k => [k, today.filter(e => e.key === k).length]).sort((a, b) => b[1] - a[1])[0];
+  const ex = Object.entries(S.hw.extra);
+  return `現在${aiPeriod()}；${ALL.map(spot).join(', ')}；可用 ${usable} 格、有車 ${taken} 格、維修中 ${ALL.filter(k => S.disabled[k]).length} 格、保留中 ${ALL.filter(k => heldUntil(k)).length} 格、使用率 ${usePct(ALL)}%`
+    + (S.eventLog.length ? `；今日進出 ${today.length} 次` : '')
+    + (today.length ? `（最多 ${top[0]} ${top[1]} 次）、進場最多 ${aiBusyHour(today.filter(e => e.occ).map(e => e.ts))}` : '')
+    + (ex.length ? `；畫面尚未設定的新車位：${ex.map(([k, o]) => `${k} ${o ? '有車' : '空位'}`).join('、')}` : '')
+    + `；感測器連線：${devOff() ? '離線' : '正常'}`;
+}
+// 自己問問題時才附上的統計（不放進共用快取）：今日每格進出次數、今日與近 7 天進場最多的時段、
+// 近 7 天各格進場排行、今日與近 7 天維修操作、裝置其他回報
+function aiStats() {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const today = S.eventLog.filter(e => e.ts >= d0.getTime()), inTs = l => l.filter(e => e.occ).map(e => e.ts);
+  const maint = S.maintLog.filter(m => m && m.ts >= d0.getTime()).length;
+  const rank = ALL.map(k => [k, S.eventLog.filter(e => e.key === k && e.occ).length]).sort((a, b) => b[1] - a[1]);
+  const m7 = ALL.map(k => [k, S.maintLog.filter(m => m.key === k && m.on).length]).filter(([, n]) => n);
+  const dev = Object.entries(S.hw.dev);
+  return `；今日各格進出：${ALL.map(k => `${k} ${today.filter(e => e.key === k).length} 次`).join('、')}`
+    + `；今日進場最多的時段：${aiBusyHour(inTs(today))}；近 7 天合計進場最多的時段：${aiBusyHour(inTs(S.eventLog))}`
+    + `；近 7 天各格進場次數（多到少）：${rank.map(([k, n]) => `${k} ${n}`).join('、')}`
+    + (currentUser ? `；今日維修操作 ${maint} 次；近 7 天停用次數：${m7.length ? m7.map(([k, n]) => `${k} ${n} 次`).join('、') : '沒有'}` : '')
+    + (dev.length ? `；裝置其他回報：${dev.map(([k, v]) => `${k}=${String(v).slice(0, 12)}`).join('、')}` : '');
+}
+// AI 失敗（額度用完、網路慢）時的本機摘要：整體狀況＋需要注意的地方；不放進快取
+function aiLocal() {
+  const warn = [...(devOff() ? ['感測器離線'] : []), ...ALL.filter(k => S.unstable[k]).map(k => `${k} 頻繁切換`),
+    ...ALL.filter(aiWeightOff).map(k => `${k} 重量與狀態不一致`), ...aiNewSpots().map(k => `新車位 ${k} 尚未設定`)];
+  const off = ALL.filter(k => S.disabled[k]), taken = usableOf(ALL).filter(k => S.occupied[k]).length;
+  return `目前可用 ${usableOf(ALL).length} 格、有車 ${taken} 格、使用率 ${usePct(ALL)}%${off.length ? `，維修中 ${off.join('、')}` : ''}。`
+    + (warn.length ? `需要注意：${warn.join('、')}。` : '目前沒有異常。');
+}
+// 日報用的資料：今日進出、各格進場、最忙時段、維修操作，再加上目前狀況
+function aiReportData() {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const today = S.eventLog.filter(e => e.ts >= d0.getTime()), ins = today.filter(e => e.occ);
+  return `日期 ${d0.getMonth() + 1}/${d0.getDate()}；今日進場 ${ins.length} 次、離場 ${today.length - ins.length} 次`
+    + `；今日各格進場：${ALL.map(k => `${k} ${ins.filter(e => e.key === k).length}`).join('、')}`
+    + `；今日進場最多的時段：${aiBusyHour(ins.map(e => e.ts))}；近 7 天進場最多的時段：${aiBusyHour(S.eventLog.filter(e => e.occ).map(e => e.ts))}`
+    + (currentUser ? `；今日維修操作 ${S.maintLog.filter(m => m.ts >= d0.getTime()).length} 次` : '') + `；目前狀況：${aiData()}`;
+}
+// AI 失敗時的本機日報
+function aiLocalReport() {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const ins = S.eventLog.filter(e => e.ts >= d0.getTime() && e.occ);
+  const rank = ALL.map(k => [k, ins.filter(e => e.key === k).length]).sort((a, b) => b[1] - a[1]);
+  return `・今日進場 ${ins.length} 次，進場最多的時段：${aiBusyHour(ins.map(e => e.ts))}`
+    + (ins.length ? `\n・最常用 ${rank[0][0]}（${rank[0][1]} 次），最少用 ${rank[rank.length - 1][0]}（${rank[rank.length - 1][1]} 次）` : '')
+    + `\n・${aiLocal()}`;
+}
+const aiCache = { data: '', n: -1, texts: [], qa: {} };   // 狀態沒變就沿用，省額度
+// 多輪對話：記住最近 3 組自己打的問答，下一題 AI 才看得懂「那」「它」指什麼
+const aiHist = [];
+const aiHistText = () => aiHist.map(h => `管理者：${h.q}\n助理：${h.a}`).join('\n');
+// 共用快取：同一份資料所有管理者共用一份回答
+async function aiShared(key, data, gen) {
+  const cRef = ref(db, `aiCache/admin/${fnv(key)}`);
+  const c = await get(cRef).then(s => s.val(), () => null);
+  if (c && c.data === data && typeof c.text === 'string' && Date.now() + srvSkew - c.ts < AI_TTL) return { text: c.text, cached: true };
+  // 規則限制 data 400 字、text 300 字，超過就不寫快取（照樣回答）
+  const text = await gen(); if (text && data.length <= 400 && text.length <= 300) set(cRef, { data, text, ts: Date.now() + srvSkew }).catch(() => {});
+  return text ? { text, cached: false } : AI_FAIL;
+}
+// mode：沒給＝摘要；{q}＝自己打的問題；{notice}＝狀態改變時主動提醒；{report}＝今日日報
+async function askAi(onText, { q, notice, report } = {}) {
+  try {
+    // 網路慢時資料可能還在讀取（慢速 3G 約 30 秒），先等最多 30 秒
+    for (let i = 0; i < 60 && !S.loaded; i++) await new Promise(r => setTimeout(r, 500));
+    if (!S.loaded) return AI_FAIL;
+    const data = aiData();
+    if (data !== aiCache.data) Object.assign(aiCache, { data, n: -1, texts: [], qa: {} });
+    const gen = async prompt => {
+      const { getAI, getGenerativeModel, GoogleAIBackend } = await import('https://www.gstatic.com/firebasejs/13.0.0/firebase-ai.js');
+      return aiGenerate(getAI(app, { backend: new GoogleAIBackend(), useLimitedUseAppCheckTokens: true }), getGenerativeModel, prompt, onText);
+    };
+    const RULE = '只根據以下資料，不要編造；資料中沒有的資訊就直接說資料中沒有。';
+    if (notice) return await aiShared(`notice#${notice}#${data}`, `${notice}｜${data}`,
+      () => gen(`你是停車場管理助理。剛剛發生：${notice}。${RULE}用一句繁體中文主動提醒管理者，並指出需要處理的車位或狀況。資料：${data}`));
+    if (report) {
+      const rd = aiReportData();
+      if (aiCache.report && aiCache.report.data === rd) return { text: aiCache.report.text, cached: true };
+      const r = await aiShared(`report#${rd}`, rd,
+        () => gen(`你是停車場管理助理。根據以下資料寫今天的營運日報：繁體中文，4～6 行，每行以「・」開頭，依序說整體車流、最忙時段、最常用與最少用的車位、維修與異常、給明天的一個具體建議。只根據資料，不要編造。資料：${rd}`));
+      if (r !== AI_FAIL) aiCache.report = { data: rd, text: r.text };
+      return r;
+    }
+    if (q) {
+      const hist = aiHistText(), key = `${hist}\n${q}`;
+      if (aiCache.qa[key]) return { text: aiCache.qa[key], cached: true };
+      const text = await gen(`你是停車場管理助理，也能回答一般問題。跟這個停車場有關的問題，只根據下方資料回答，不要編造，資料中沒有就直接說資料中沒有；其他任何問題（生活、知識、聊天等）都可以用你的一般知識回答，但不要編造停車場的即時狀況。用繁體中文簡短回答（最多三句）。`
+        + (hist ? `先前對話（只用來理解代名詞，狀況以下方資料為準）：\n${hist}\n` : '') + `資料：${data}${aiStats()}\n管理者問題：「${q}」`);
+      if (!text) return AI_FAIL;
+      aiCache.qa[key] = text; return { text, cached: false };
+    }
+    const n = aiPickVariant(aiCache);
+    if (aiCache.texts[n]) { aiCache.n = n; return { text: aiCache.texts[n], cached: true }; }
+    const vary = ['', '請換一種說法。', '請用不同的句型，先講需要注意的地方再講整體狀況。'][n];
+    const r = await aiShared(`${data}#${n}`, data,
+      () => gen(`你是停車場管理助理。只根據以下資料，用三句以內繁體中文：先摘要目前狀況，再指出需要注意的車位（例如頻繁切換、重量與狀態不一致、停很久、維修停用太久、畫面尚未設定的新車位、或連線異常），最後給一個具體可以做的建議（例如去檢查哪一格的感測器）；沒有異常就說目前一切正常。不要編造。${vary}資料：${data}`));
+    if (r !== AI_FAIL) { aiCache.n = n; aiCache.texts[n] = r.text; }
+    return r;
+  } catch (e) { console.warn(e); return AI_FAIL; }
+}
+let aiBusy = false;
+async function runAi(mode = {}) {
+  if (aiBusy) return; aiBusy = true;
+  const a = document.getElementById('ai-ans'), btns = ['ai-btn', 'ai-report', 'ai-ask-btn'].map(id => document.getElementById(id)), { q, notice, report } = mode;
+  const hist = q && aiHist.length ? { n: aiHist.length, reset: () => { aiHist.length = 0; a.querySelector('.aiReset')?.remove(); } } : null;
+  a.classList.remove('local'); a.classList.toggle('report', !!report);
+  btns.forEach(b => b.disabled = true); aiThinking(a, q, { hist, notice });
+  const r = await askAi(t => t ? aiShow(a, t, { q, hist, notice, streaming: true }) : aiThinking(a, q, { hist, notice }), mode);
+  if (q && r !== AI_FAIL) { aiHist.push({ q, a: r.text }); if (aiHist.length > 3) aiHist.shift(); }
+  // AI 失敗（額度用完、網路慢）就改用本機規則，畫面不會只剩「暫時無法回答」
+  const local = r === AI_FAIL && S.loaded;
+  const text = !local ? r.text : report ? aiLocalReport() : (q ? 'AI 暫時無法回答，先給你目前的狀況：' : '') + aiLocal();
+  aiShow(a, text, { q, hist, notice, onSpot: aiGoSpot, typing: r.cached }); a.classList.toggle('local', local);
+  // 日報可以一鍵複製（貼到報告或群組）
+  if (report && text !== AI_FAIL.text) { const c = document.createElement('button'); c.type = 'button'; c.className = 'aiCopy'; c.innerHTML = ICON.copy + ' 複製';
+    c.onclick = () => navigator.clipboard.writeText(text).then(() => toast('已複製日報', 'ok'), () => toast('複製失敗，請手動選取文字', 'err')); a.appendChild(c); }
+  btns.forEach(b => b.disabled = false); aiBusy = false;
+}
+document.getElementById('ai-btn').onclick = () => runAi();
+document.getElementById('ai-report').onclick = () => runAi({ report: true });
+// 點 AI 回答裡的車位名稱：捲到那格並閃一下外框
+function aiGoSpot(k) {
+  const c = document.querySelector(`.spot-card[data-key="${k}"]`); if (!c) return;
+  c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('ai-hl'); setTimeout(() => c.classList.remove('ai-hl'), 1800);
+}
+document.getElementById('ai-ask').onsubmit = e => { e.preventDefault(); const i = document.getElementById('ai-q'), q = i.value.trim(); if (!q || aiBusy) return; i.value = ''; runAi({ q }); };
+aiChips(document.getElementById('ai-chips'), ['今天哪格進出最頻繁？', '哪個時段最忙？', '有需要處理的車位嗎？'], q => { if (!aiBusy) runAi({ q }); });
+aiVoice(document.getElementById('ai-mic'), document.getElementById('ai-q'), () => document.getElementById('ai-ask').requestSubmit());
+// 主動提醒（登入後）：只在「剛全滿／感測器開始頻繁切換／感測器離線或恢復」時說話；每台最多每分鐘一次
+{ let prev = null, at = 0;
+  setInterval(() => { if (!S.loaded) return;
+    const cur = { full: !ALL.some(isFree), off: devOff(), unstable: ALL.filter(k => S.unstable[k]),
+      weight: ALL.filter(aiWeightOff), spots: aiNewSpots() };
+    let ev = '';
+    if (prev) {
+      const newly = cur.unstable.filter(k => !prev.unstable.includes(k));
+      const wNew = cur.weight.filter(k => !prev.weight.includes(k)), sNew = cur.spots.filter(k => !prev.spots.includes(k));
+      ev = newly.length ? `${newly.join('、')} 的感測器開始頻繁切換`
+        : cur.off !== prev.off ? (cur.off ? '感測器剛剛離線' : '感測器恢復連線')
+        : wNew.length ? `${wNew.join('、')} 的重量和車位狀態不一致`
+        : sNew.length ? `偵測到畫面尚未設定的新車位 ${sNew.join('、')}`
+        : cur.full && !prev.full ? '停車場剛剛全滿了' : '';
+    }
+    prev = cur;
+    if (ev && currentUser && !aiBusy && !document.hidden && document.activeElement !== document.getElementById('ai-q') && Date.now() - at > 60000) { at = Date.now(); runAi({ notice: ev }); }
+  }, 3000); }
+
+/* ── Firebase ───────────────────────────────────────────────────── */
+onValue(ref(db, 'parking'), snap => {
+  const now = Date.now(), data = snap.val() || {};
+  ALL.forEach(key => {
+    const occ = parseOccupied(data[key]), prev = S.occupied[key];
+    if (S.loaded && occ !== prev) {
+      S.since[key] = now;
+      const evtSec = Math.floor(now / 1000);
+      // ESP32 在線時事件由 ESP32 自己寫；離線時才由登入中的管理網頁補記
+      if (currentUser && devOff()) set(ref(db, `events/${key}_${evtSec}`), { ts: now + srvSkew, key, label: label(key), occ: occ ? 1 : 0, prev: prev ? 1 : 0 });
+      S.changeTimes[key].push(now);
+      S.changeTimes[key] = S.changeTimes[key].filter(t => now-t <= 10000);
+      S.unstable[key] = S.changeTimes[key].length >= 5;
+      flashKeys.add(key); mapFlashKeys.add(key); beep(occ ? 440 : 880);
+      S.spotHistory[key].push({ts:now, occ});
+      if (S.spotHistory[key].length > 15) S.spotHistory[key].shift();
+    }
+    S.occupied[key] = occ;
+  });
+  // 預留：parking/ 出現畫面還沒設定的新車位（例如 indoor5），AI 會提醒管理者
+  S.hw.extra = Object.fromEntries(Object.keys(data).filter(k => !ALL.includes(k)).map(k => [k, parseOccupied(data[k])]));
+  const allFull = S.loaded && !ALL.some(isFree);
+  if (allFull && !S.wasAllFull) beep(523, 0.6);
+  S.wasAllFull = allFull;
+  S.loaded   = true;
+  lastSyncTs = now;
+  renderAll(); drawChart();
+});
+
+onValue(ref(db, '.info/connected'), snap => {
+  const on = snap.val() === true, was = dbOnline;
+  dbOnline = on;
+  if (on && !was && S.loaded) resync();
+  document.getElementById('conn-dot').className    = 'sb-conn-dot ' + (on ? 'online pulse' : 'offline');
+  document.getElementById('conn-text').textContent = on ? '已連線' : '離線';
+});
+
+onValue(ref(db, 'admin/disabled'), snap => {
+  const data = snap.val() || {};
+  ALL.forEach(k => { S.disabled[k] = data[k] === true; });
+  renderKPI(); renderSpots(); renderMap(); renderAlerts();
+});
+
+onValue(ref(db, '.info/serverTimeOffset'), snap => { srvSkew = snap.val() || 0; });
+
+onValue(ref(db, 'device/lastSeen'), snap => {
+  const v = snap.val();
+  devSeen = typeof v === 'number' ? v : null;
+  renderDevice();
+});
+
+// 預留：ESP32 之後上傳的重量 sensors/<key>（數字或 {weight}）與門檻 admin/weightThreshold，兩者都有 AI 才比對
+onValue(ref(db, 'sensors'), snap => {
+  S.hw.weight = Object.fromEntries(Object.entries(snap.val() || {})
+    .map(([k, v]) => [k, Number(v && typeof v === 'object' ? v.weight : v)]).filter(([, w]) => Number.isFinite(w)));
+}, () => { S.hw.weight = {}; });
+onValue(ref(db, 'admin/weightThreshold'), snap => {
+  const v = snap.val(), t = Number(v);
+  S.hw.thr = v !== null && Number.isFinite(t) ? t : null;
+}, () => { S.hw.thr = null; });
+
+onValue(ref(db, 'reserve'), snap => {
+  S.reserve = snap.val() || {};
+  renderKPI(); renderSpots(); renderMap(); renderAlerts();
+});
+
+
+// 最近 7 天的事件（開啟頁面時往回算 7 天；顯示時再依目前時間過濾）
+// 每小時重新訂閱一次，讓 7 天的起點跟著時間往前移（頁面開很久也不會越讀越多）
+let eventsUnsub = null;
+function subscribeEvents() {
+  if (eventsUnsub) eventsUnsub();
+  eventsUnsub = onValue(query(ref(db, 'events'), orderByChild('ts'), startAt(Date.now() - KEEP_MS)), snap => {
+    const items = [];
+    snap.forEach(child => {
+      const v = child.val();
+      items.push({ ts: v.ts, key: v.key, label: v.label, occ: !!v.occ, prev: !!v.prev });
+    });
+    S.eventLog = items.reverse();
+    renderLog(); drawChart(chartHoverX);
+  });
+}
+subscribeEvents();
+setInterval(subscribeEvents, 3600 * 1000);
+
+// 每 60 秒主動向 Firebase 確認一次，成功就把「幾秒前更新」歸回 1 秒（資料變化仍由上面的 onValue 處理）
+function resync() {
+  get(ref(db, 'parking')).then(() => { lastSyncTs = Date.now(); tickSync(); }).catch(() => {});
+}
+setInterval(() => { if (dbOnline) resync(); }, 60000);
+
+// 上方「N 秒前更新」與每格「N 秒前確認」（跟使用者網頁一樣 1～59 秒循環）
+// 感測器離線：頁面連得上 Firebase，但 ESP32 超過 10 秒沒寫 device/lastSeen
+function devOff() { return S.loaded && dbOnline && (!devSeen || Date.now() + srvSkew - devSeen > DEV_TIMEOUT); }
+let devWasOff = null;
+function renderDevice() {
+  const off = devOff(), el = document.getElementById('device-banner');
+  devWasOff = off;
+  el.className   = 'banner' + (off ? ' show' : '');
+  el.textContent = !off ? '' : devSeen
+    ? `感測器離線：ESP32 已超過 10 秒沒有回報（最後回報 ${fmtTime(devSeen)}），車位狀態可能不是最新。`
+    : '感測器尚未連線：還沒收到 ESP32 的回報，車位狀態可能不是最新。';
+  tickSync();
+}
+function agoText() {
+  if (!dbOnline) return '離線';
+  if (devOff()) return '感測器離線';
+  const s = Math.max(1, Math.floor((Date.now() - lastSyncTs) / 1000));
+  return s < 60 ? `${s} 秒前確認` : `${Math.floor(s/60)} 分鐘前確認`;
+}
+function tickSync() {
+  if (!lastSyncTs) return;
+  const el = document.getElementById('last-sync');
+  const s  = Math.max(1, Math.floor((Date.now() - lastSyncTs) / 1000));
+  el.textContent = !dbOnline ? `離線・最後更新 ${fmtTime(lastSyncTs).slice(0, 5)}`
+    : devOff() ? (devSeen ? `感測器離線・最後回報 ${fmtTime(devSeen).slice(0, 5)}` : '感測器尚未連線')
+    : s < 60 ? `${s} 秒前更新` : `${Math.floor(s/60)} 分鐘前更新`;
+  const a = agoText();
+  document.querySelectorAll('[data-ago]').forEach(e => { e.textContent = a; });
+}
+
+/* ── Timers ─────────────────────────────────────────────────────── */
+let heldSig = '';
+setInterval(() => {
+  if (devOff() !== devWasOff) renderDevice();   // 感測器剛斷線或恢復 → 立刻顯示
+  tickSync();
+  const sig = ALL.map(heldUntil).join();
+  if (sig !== heldSig) { heldSig = sig; renderKPI(); renderSpots(); renderMap(); renderAlerts(); }
+}, 1000);
+
+setInterval(() => {
+  const now = Date.now(); let changed = false;
+  ALL.forEach(k => {
+    S.changeTimes[k] = S.changeTimes[k].filter(t => now-t <= 10000);
+    const next = S.changeTimes[k].length >= 5;
+    if (next !== S.unstable[k]) { S.unstable[k] = next; changed = true; }
+  });
+  if (changed) { renderSpots(); renderAlerts(); }
+}, 2000);
+
+/* ── Log filters ────────────────────────────────────────────────── */
+const spotBoxes = [...document.querySelectorAll('#log-filter-spot input[type=checkbox]')];
+function syncSpotFilter() {
+  logFilter.spots = new Set(spotBoxes.filter(b => b.checked).map(b => b.value));
+  document.getElementById('log-spot-sum').textContent = (logFilter.spots.size ? spotTag() : '所有車位') + ' ▾';
+  renderLog();
+}
+spotBoxes.forEach(b => b.addEventListener('change', syncSpotFilter));
+document.querySelectorAll('#log-filter-spot [data-q]').forEach(btn => btn.addEventListener('click', () => {
+  spotBoxes.forEach(b => { b.checked = !!btn.dataset.q && b.value.startsWith(btn.dataset.q); });
+  syncSpotFilter();
+}));
+document.addEventListener('click', e => {
+  const d = document.getElementById('log-filter-spot');
+  if (d.open && !d.contains(e.target)) d.open = false;
+});
+document.getElementById('log-filter-type').addEventListener('change', e => {
+  logFilter.type = e.target.value; renderLog();
+});
+document.getElementById('btn-clear-log').addEventListener('click', async () => {
+  if (denied('clear')) return;
+  const n = S.eventLog.length + S.maintLog.length;
+  if (!n) { toast('目前沒有事件可清除', 'info'); return; }
+  const ok = await showModal('清除事件紀錄', `確認清除目前 ${n} 筆紀錄（含維修紀錄）？此操作無法復原。`, { okLabel:'清除', danger:true, icon:'trash' });
+  if (!ok) return;
+  await Promise.all([remove(ref(db, 'events')), remove(ref(db, 'maintLog'))]);
+  toast('事件紀錄已清除', 'ok');
+});
+
+/* ── KPI counter ────────────────────────────────────────────────── */
+const prevKPI = { free: null, indoor: null, outdoor: null, pct: null };
+function countUp(el, fromVal, toVal, suffix='', dur=480) {
+  if (fromVal === null || fromVal === toVal) { el.textContent = toVal + suffix; return; }
+  if (el._raf) cancelAnimationFrame(el._raf);
+  const t0 = performance.now(), diff = toVal - fromVal;
+  function step(now) {
+    const t = Math.min((now - t0)/dur, 1);
+    const e = 1 - Math.pow(1-t, 3);
+    el.textContent = Math.round(fromVal + diff*e) + suffix;
+    if (t < 1) el._raf = requestAnimationFrame(step);
+    else el.textContent = toVal + suffix;
+  }
+  el._raf = requestAnimationFrame(step);
+}
+
+/* ── Sparkline ──────────────────────────────────────────────────── */
+function drawSparkline(canvas, history, currentOcc) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio||1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width || 80, H = 20;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+  const DARK = document.body.classList.contains('dark');
+  const data = history && history.length ? history.slice(-12) : [{occ:currentOcc}];
+  const bw = W / data.length;
+  data.forEach((d,i) => {
+    const x = i*bw;
+    const barH = d.occ ? H*0.7 : H*0.35;
+    const y = H - barH;
+    ctx.fillStyle = d.occ
+      ? (DARK?'rgba(214,69,69,.55)':'rgba(214,69,69,.45)')
+      : (DARK?'rgba(42,157,143,.55)':'rgba(42,157,143,.45)');
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x+1,y,bw-2,barH,2);
+    else ctx.rect(x+1,y,bw-2,barH);
+    ctx.fill();
+  });
+}
+
+/* ── Render ─────────────────────────────────────────────────────── */
+function renderAll() { renderKPI(); renderSpots(); renderLog(); renderAlerts(); renderMap(); }
+
+function renderKPI() {
+  const free = ALL.filter(isFree).length;
+  const iF   = INDOOR.filter(isFree).length;
+  const oF   = OUTDOOR.filter(isFree).length;
+  const pct  = S.loaded ? usePct(ALL) : 0;   // 使用率＝有車 ÷ 可用車位（不含維修中，同使用者網頁）
+  const full = S.loaded && free === 0;
+
+  // Ring chart
+  const CIRC = 251.33;
+  const ringEl = document.getElementById('ring-circle');
+  if (ringEl) {
+    const filled = S.loaded ? (CIRC * pct / 100) : 0;
+    ringEl.style.strokeDasharray = `${filled} ${CIRC}`;
+    // Color based on occupancy
+    let ringColor = '#2A9D8F';
+    if (pct >= 100) ringColor = '#D64545';
+    else if (pct >= 75) ringColor = '#F5B700';
+    ringEl.style.stroke = ringColor;
+  }
+  const ringPctEl = document.getElementById('ring-pct');
+  if (ringPctEl) {
+    if (S.loaded) { countUp(ringPctEl, prevKPI.pct, pct, '%'); }
+    else ringPctEl.textContent = '–';
+  }
+
+  // Free number
+  const fEl = document.getElementById('kpi-free');
+  if (fEl) {
+    if (S.loaded) { countUp(fEl, prevKPI.free, free); prevKPI.free = free; }
+    else fEl.textContent = '–';
+    fEl.className = 'ring-free-num' + (full ? ' full' : '');
+  }
+
+  const riEl = document.getElementById('ring-indoor');
+  if (riEl) riEl.textContent = S.loaded ? iF : '–';
+  const roEl = document.getElementById('ring-outdoor');
+  if (roEl) roEl.textContent = S.loaded ? oF : '–';
+
+  // Stat cards
+  const indoorEl = document.getElementById('kpi-indoor');
+  if (indoorEl) {
+    if (S.loaded) { countUp(indoorEl, prevKPI.indoor, iF); prevKPI.indoor = iF; }
+    else indoorEl.textContent = '–';
+  }
+  const outdoorEl = document.getElementById('kpi-outdoor');
+  if (outdoorEl) {
+    if (S.loaded) { countUp(outdoorEl, prevKPI.outdoor, oF); prevKPI.outdoor = oF; }
+    else outdoorEl.textContent = '–';
+  }
+  const pctEl = document.getElementById('kpi-pct');
+  if (pctEl) {
+    if (S.loaded) { countUp(pctEl, prevKPI.pct, pct, '%'); prevKPI.pct = pct; }
+    else pctEl.textContent = '–';
+  }
+  if (S.loaded) prevKPI.pct = pct;
+
+  // Bars
+  const bar = document.getElementById('kpi-bar');
+  if (bar) {
+    bar.style.width = pct + '%';
+    bar.className = 'kpi-bar-fill' + (pct >= 100 ? ' over' : pct >= 75 ? ' warn' : '');
+  }
+  const iBar = document.getElementById('kpi-indoor-bar');
+  if (iBar) {
+    const iPct  = usePct(INDOOR);
+    iBar.style.width = iPct + '%';
+    iBar.className = 'kpi-bar-fill' + (iPct >= 100 ? ' over' : iPct >= 75 ? ' warn' : '');
+  }
+  const oBar = document.getElementById('kpi-outdoor-bar');
+  if (oBar) {
+    const oPct  = usePct(OUTDOOR);
+    oBar.style.width = oPct + '%';
+    oBar.className = 'kpi-bar-fill' + (oPct >= 100 ? ' over' : oPct >= 75 ? ' warn' : '');
+  }
+}
+
+function renderSpots() {
+  const iF = INDOOR.filter(isFree).length;
+  const oF = OUTDOOR.filter(isFree).length;
+  document.getElementById('indoor-count').textContent  = `${S.loaded?iF:'–'} / ${usableOf(INDOOR).length} 空`;
+  document.getElementById('outdoor-count').textContent = `${S.loaded?oF:'–'} / ${usableOf(OUTDOOR).length} 空`;
+  buildGrid('grid-indoor',  INDOOR);
+  buildGrid('grid-outdoor', OUTDOOR);
+}
+
+function buildGrid(id, keys) {
+  const g = document.getElementById(id);
+  g.innerHTML = '';
+  keys.forEach(k => {
+    const card = buildCard(k);
+    g.appendChild(card);
+    requestAnimationFrame(() => {
+      const spark = card.querySelector('.sc-sparkline');
+      if (spark) drawSparkline(spark, S.spotHistory[k], S.occupied[k]);
+    });
+    if (flashKeys.has(k)) {
+      const cls = 'flash-' + (S.occupied[k] ? 'taken' : 'free');
+      setTimeout(() => {
+        card.classList.add(cls);
+        setTimeout(() => card.classList.remove(cls), 750);
+      }, 10);
+      flashKeys.delete(k);
+    }
+  });
+}
+
+function buildCard(key) {
+  const occ  = S.occupied[key], dis = S.disabled[key], held = heldUntil(key);
+  const unst = S.unstable[key], lbl = label(key);
+
+  let cls;
+  if (!S.loaded) cls = 'spot-card loading';
+  else if (dis)  cls = 'spot-card dis';
+  else if (occ)  cls = 'spot-card taken';
+  else if (held) cls = 'spot-card held';
+  else           cls = 'spot-card free';
+
+  const status = !S.loaded ? '讀取中' : dis ? '維修中' : occ ? '有車' : held ? `保留到 ${fmtTime(held).slice(0, 5)}` : '空位';
+  const mCls   = 'btn-xs btn-maint' + (dis ? ' on' : '');
+
+  const card = document.createElement('div');
+  card.className = cls; card.dataset.key = key;
+  card.innerHTML = `
+    <div class="sc-accent"></div>
+    <div class="sc-body">
+      <div class="sc-top-row">
+        <div class="sc-label">${lbl}</div>
+        <div class="sc-status-dot"></div>
+      </div>
+      <div class="sc-pill">${status}</div>
+      ${S.loaded ? `<div class="sc-dur" data-ago>${agoText()}</div>` : '<div class="sc-dur"></div>'}
+      ${unst ? '<div class="sc-unstable">不穩</div>' : ''}
+      <div class="sc-actions">
+        <button class="btn-xs btn-toggle">切換</button>
+        <button class="${mCls}">${dis ? '恢復' : '停用'}</button>
+      </div>
+      <canvas class="sc-sparkline"></canvas>
+    </div>`;
+
+  card.querySelector('.btn-toggle').addEventListener('click', async e => {
+    e.stopPropagation();
+    if (!S.loaded || denied('parking')) return;
+    const ok = await showModal(
+      `切換車位 ${lbl}`,
+      `確認將車位 ${lbl} 切換為「${occ ? '空位' : '有車'}」？`,
+      { icon: occ ? 'check' : 'car' }
+    );
+    if (!ok) return;
+    set(ref(db, `parking/${key}`), occ ? '0' : '1')
+      .then(() => toast(`車位 ${lbl} 已切換為${occ?'空位':'有車'}`, 'ok'))
+      .catch(err => toast('寫入失敗：' + err.message, 'err'));
+  });
+
+  card.querySelector('.btn-maint').addEventListener('click', async e => {
+    e.stopPropagation();
+    if (denied('maint')) return;
+    if (dis) {
+      const ok = await showModal(`恢復車位 ${lbl}`, `確認恢復車位 ${lbl} 為正常狀態？`, { icon:'wrench' });
+      if (!ok) return;
+      Promise.all([set(ref(db, `admin/disabled/${key}`), null), logMaint(key, false)])
+        .then(() => toast(`車位 ${lbl} 已恢復`, 'ok'))
+        .catch(err => toast('寫入失敗：' + err.message, 'err'));
+    } else {
+      const ok = await showModal(
+        `停用車位 ${lbl}`,
+        `確認將車位 ${lbl} 設為「維修中」？\n（不影響感測器資料）`,
+        { okLabel:'停用', danger:true, icon:'wrench' }
+      );
+      if (!ok) return;
+      Promise.all([set(ref(db, `admin/disabled/${key}`), true), logMaint(key, true)])
+        .then(() => toast(`車位 ${lbl} 已設為維修中`, 'ok'))
+        .catch(err => toast('寫入失敗：' + err.message, 'err'));
+    }
+  });
+
+  return card;
+}
+
+// 事件紀錄目前的篩選結果（表格與 CSV 匯出共用）
+// 車位變化與維修紀錄合併、依時間新到舊
+function getFilteredEvents() {
+  const cutoff = Date.now() - KEEP_MS, t = logFilter.type;
+  const src = t === 'maint' ? S.maintLog : t ? S.eventLog : [...S.eventLog, ...S.maintLog].sort((a,b) => b.ts - a.ts);
+  return src.filter(e =>
+    e.ts >= cutoff &&
+    (!logFilter.spots.size || logFilter.spots.has(e.label)) &&
+    (!t || t === 'maint' || (t === 'taken' ? e.occ : !e.occ))
+  );
+}
+
+// 選取的車位寫成短字串：I1,I2,I3,O2 → I1-I3+O2
+function spotTag() {
+  const parts = [];
+  ['I','O'].forEach(p => {
+    const n = [1,2,3,4].filter(i => logFilter.spots.has(p + i));
+    for (let a = 0; a < n.length; ) {
+      let b = a; while (b + 1 < n.length && n[b+1] === n[b] + 1) b++;
+      parts.push(a === b ? `${p}${n[a]}` : `${p}${n[a]}-${p}${n[b]}`); a = b + 1;
+    }
+  });
+  return parts.join('+');
+}
+
+const evAfter  = e => e.maint ? (e.on ? '維修中' : '恢復正常') : (e.occ ? '有車' : '空位');
+const evBefore = e => e.maint ? (e.on ? '正常' : '維修中') : (e.prev ? '有車' : '空位');
+
+function logMaint(key, on) {
+  const now = Date.now();
+  return set(ref(db, `maintLog/${key}_${Math.floor(now / 1000)}`), { ts: now, key, label: label(key), on });
+}
+
+// 進場熱度：近 7 天 × 24 小時的「有車停入」次數，顏色越深越多（只讀事件紀錄）
+function renderHeat() {
+  const el = document.getElementById('heat');
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const days = [...Array(7).keys()].map(i => new Date(d0.getTime() - (6 - i) * DAY_MS));
+  const grid = days.map(() => Array(24).fill(0));
+  S.eventLog.forEach(e => { if (!e.occ) return; const t = new Date(e.ts), d = days.findIndex(x => t >= x && t - x < DAY_MS); if (d >= 0) grid[d][t.getHours()]++; });
+  const max = Math.max(1, ...grid.flat()), tot = grid.flat().reduce((a, b) => a + b, 0), wk = '日一二三四五六';
+  el.innerHTML = days.map((d, i) => `<span>${d.getMonth() + 1}/${d.getDate()} ${wk[d.getDay()]}</span>` + grid[i].map((n, h) =>
+      `<i${n ? ` style="background:rgba(42,157,143,${(0.2 + 0.8 * n / max).toFixed(2)})"` : ''} title="${d.getMonth() + 1}/${d.getDate()} ${h}～${h + 1} 點：進場 ${n} 次"></i>`).join('')).join('')
+    + '<span></span>' + [0, 6, 12, 18].map(h => `<em>${h} 點</em>`).join('');
+  document.getElementById('heat-meta').textContent = tot ? `共 ${tot} 次進場・最多一小時 ${max} 次` : '近 7 天沒有進場紀錄';
+}
+function renderLog() {
+  renderHeat();
+  const tbody = document.getElementById('log-tbody');
+  const badge = document.getElementById('sb-events-badge');
+
+  const cutoff = Date.now() - KEEP_MS;
+  const log7 = S.eventLog.filter(e => e.ts >= cutoff);
+  const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+  const todayCnt = log7.filter(e => e.ts >= startOfDay.getTime()).length;
+  document.getElementById('log-today').textContent = `今日 ${todayCnt} 筆`;
+
+  // Analytics row
+  const anToday = document.getElementById('log-an-today');
+  const anTotal = document.getElementById('log-an-total');
+  const anTop   = document.getElementById('log-an-top');
+  if (anToday) anToday.textContent = todayCnt;
+  if (anTotal) anTotal.textContent = log7.length;
+  if (anTop) {
+    const counts = {};
+    log7.forEach(e => { counts[e.label] = (counts[e.label]||0) + 1; });
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    anTop.textContent = top ? `${top[0]}（${top[1]} 次）` : '—';
+  }
+
+  const filtered = getFilteredEvents();
+
+  if (!filtered.length) {
+    const msg = log7.length || S.maintLog.length ? '無符合篩選條件的事件' : '近 7 天尚無事件，等待車位變化…';
+    tbody.innerHTML = `<tr><td colspan="4" class="log-empty">${msg}</td></tr>`;
+    badge.className = 'sb-badge'; badge.textContent = '';
+    const bnBadge2 = document.getElementById('bn-events-badge');
+    if (bnBadge2) { bnBadge2.className = 'bn-badge'; bnBadge2.textContent = ''; }
+  } else {
+    tbody.innerHTML = filtered.slice(0, 500).map(e => `
+      <tr>
+        <td style="color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap">${fmtDateTime(e.ts)}</td>
+        <td><strong>${e.label}</strong></td>
+        <td class="log-st ${e.maint?'maint':e.occ?'taken':'free'}">${e.maint ? (e.on ? '維修中' : '恢復正常') : e.occ ? '有車' : '空位'}</td>
+        <td style="color:var(--ink-3)">${evBefore(e)}</td>
+      </tr>`).join('');
+    badge.className  = 'sb-badge show';
+    badge.textContent = log7.length;
+    const bnBadge = document.getElementById('bn-events-badge');
+    if (bnBadge) { bnBadge.className = 'bn-badge show'; bnBadge.textContent = log7.length; }
+  }
+}
+
+function renderAlerts() {
+  const full   = S.loaded && !ALL.some(isFree);   // 維修中、保留中都不算空位
+  const fullEl = document.getElementById('full-banner');
+  fullEl.className   = 'banner' + (full ? ' show' : '');
+  fullEl.textContent = full ? '停車場已全滿，目前無任何空位可用。' : '';
+
+  const bad     = ALL.filter(k=>S.unstable[k]);
+  const alertEl = document.getElementById('alert-banner');
+  alertEl.className   = 'banner' + (bad.length ? ' show' : '');
+  alertEl.textContent = bad.length
+    ? `感測異常：車位 ${bad.map(label).join('、')} 在 10 秒內變化超過 5 次，請確認感測器。` : '';
+}
+
+setInterval(() => drawChart(chartHoverX), 60000);   // 讓趨勢圖最後一段跟著時間前進
+
+/* ── Chart with hover tooltip ───────────────────────────────────── */
+let chartHoverX = null;
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawChart(hoverX) {
+  const canvas = document.getElementById('usage-chart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const CW  = canvas.getBoundingClientRect().width || 600;
+  const CH  = 150;
+  canvas.width  = CW * dpr;
+  canvas.height = CH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const DARK   = document.body.classList.contains('dark');
+  const PL=44, PR=12, PT=12, PB=24;
+  const W=CW-PL-PR, H=CH-PT-PB;
+  const gridC  = DARK ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)';
+  const labelC = DARK ? '#6B7280' : '#9CA3AF';
+
+  ctx.clearRect(0, 0, CW, CH);
+
+  // Grid lines + Y labels
+  [0,25,50,75,100].forEach(p => {
+    const y = PT + H*(1-p/100);
+    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+W,y);
+    ctx.strokeStyle=gridC; ctx.lineWidth=1; ctx.setLineDash([]); ctx.stroke();
+    ctx.fillStyle=labelC; ctx.font=`10px Inter,sans-serif`;
+    ctx.textAlign='right'; ctx.fillText(p+'%', PL-7, y+4);
+  });
+
+  const hist = usageSeries(chartRange);
+  if (hist.length < 2) {
+    ctx.fillStyle=labelC; ctx.font='13px Inter,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(S.loaded ? '這段期間尚無事件紀錄' : '資料讀取中…', PL+W/2, PT+H/2+5);
+    return;
+  }
+
+  const pts = hist.map((d,i) => ({
+    x: PL + W*i/(hist.length-1),
+    y: PT + H*(1-d.pct/100),
+    pct: d.pct,
+    ts:  d.ts,
+  }));
+
+  // Area fill
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, PT+H); ctx.lineTo(pts[0].x, pts[0].y);
+  for (let i=0;i<pts.length-1;i++) {
+    const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
+    ctx.bezierCurveTo(
+      p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6,
+      p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6,
+      p2.x, p2.y
+    );
+  }
+  ctx.lineTo(pts[pts.length-1].x, PT+H); ctx.closePath();
+  const grad = ctx.createLinearGradient(0, PT, 0, PT+H);
+  grad.addColorStop(0,   'rgba(42,157,143,.22)');
+  grad.addColorStop(.65, 'rgba(42,157,143,.05)');
+  grad.addColorStop(1,   'rgba(42,157,143,0)');
+  ctx.fillStyle=grad; ctx.fill();
+
+  // Line stroke
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i=0;i<pts.length-1;i++) {
+    const p0=pts[Math.max(0,i-1)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(pts.length-1,i+2)];
+    ctx.bezierCurveTo(
+      p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6,
+      p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6,
+      p2.x, p2.y
+    );
+  }
+  ctx.strokeStyle='#2A9D8F'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.setLineDash([]); ctx.stroke();
+
+  // Data dots（點太多時省略）
+  if (pts.length <= 50) pts.forEach(p => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fillStyle='#2A9D8F'; ctx.fill();
+  });
+
+  // 75% threshold line
+  const ty = PT + H*0.25;
+  ctx.beginPath(); ctx.setLineDash([5,4]);
+  ctx.moveTo(PL, ty); ctx.lineTo(PL+W, ty);
+  ctx.strokeStyle='rgba(214,69,69,.5)'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.setLineDash([]);
+
+  // X-axis time labels
+  ctx.fillStyle=labelC; ctx.font='10px Inter,sans-serif'; ctx.textBaseline='bottom';
+  ctx.textAlign='left';  ctx.fillText(fmtShort(hist[0].ts), PL, CH-4);
+  ctx.textAlign='right'; ctx.fillText(fmtShort(hist[hist.length-1].ts), PL+W, CH-4);
+  ctx.textBaseline='alphabetic';
+
+  // Hover tooltip
+  if (hoverX != null && hoverX >= PL && hoverX <= PL+W) {
+    // Find nearest point
+    let nearest = pts[0], minDist = Infinity;
+    pts.forEach(p => {
+      const d = Math.abs(p.x - hoverX);
+      if (d < minDist) { minDist = d; nearest = p; }
+    });
+
+    // Vertical crosshair
+    ctx.beginPath(); ctx.setLineDash([4,3]);
+    ctx.moveTo(nearest.x, PT); ctx.lineTo(nearest.x, PT+H);
+    ctx.strokeStyle = DARK ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.12)';
+    ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+
+    // Highlight dot
+    ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 5.5, 0, Math.PI*2);
+    ctx.fillStyle='#2A9D8F'; ctx.fill();
+    ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 3.5, 0, Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+
+    // Tooltip box
+    const tipW = 112, tipH = 40, tipR = 6;
+    const tipX = Math.min(Math.max(nearest.x - tipW/2, PL), PL+W - tipW);
+    const tipY = nearest.y - tipH - 10;
+    const finalTipY = tipY < PT ? nearest.y + 10 : tipY;
+
+    ctx.save();
+    roundRect(ctx, tipX, finalTipY, tipW, tipH, tipR);
+    ctx.fillStyle   = DARK ? '#1F2937' : '#111827';
+    ctx.shadowColor = 'rgba(0,0,0,.25)';
+    ctx.shadowBlur  = 8; ctx.shadowOffsetY = 3;
+    ctx.fill();
+    ctx.restore();
+
+    // Arrow
+    ctx.beginPath();
+    const ax = nearest.x;
+    if (tipY >= PT) {
+      ctx.moveTo(ax-5, finalTipY+tipH);
+      ctx.lineTo(ax+5, finalTipY+tipH);
+      ctx.lineTo(ax, finalTipY+tipH+6);
+    }
+    ctx.fillStyle = DARK ? '#1F2937' : '#111827';
+    ctx.fill();
+
+    ctx.fillStyle = '#F9FAFB';
+    ctx.font = `700 14px Inter,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(nearest.pct + '%', tipX+tipW/2, finalTipY+18);
+    ctx.fillStyle = '#9CA3AF';
+    ctx.font = `400 10px Inter,sans-serif`;
+    ctx.fillText(fmtShort(nearest.ts), tipX+tipW/2, finalTipY+32);
+  }
+}
+
+// Chart mouse events
+(function() {
+  const canvas = document.getElementById('usage-chart');
+  if (!canvas) return;
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    chartHoverX = e.clientX - rect.left;
+    drawChart(chartHoverX);
+  });
+  canvas.addEventListener('mouseleave', () => {
+    chartHoverX = null;
+    drawChart();
+  });
+})();
+
+window.addEventListener('resize', () => drawChart(chartHoverX));
+drawChart();
+
+/* ── CSV ────────────────────────────────────────────────────────── */
+document.getElementById('btn-export').addEventListener('click', () => {
+  if (denied('export')) return;
+  const list = getFilteredEvents();
+  if (!list.length) { toast(S.eventLog.length + S.maintLog.length ? '目前篩選沒有資料' : '目前尚無事件可匯出', 'info'); return; }
+  const rows = list.map(e => {
+    const t = new Date(e.ts).toLocaleString('zh-TW',{hour12:false});
+    return `${t},${e.label},${evAfter(e)},${evBefore(e)}`;
+  });
+  const blob = new Blob(
+    ['\uFEFF' + ['時間,車位,變化後,變化前', ...rows].join('\r\n')],
+    { type: 'text/csv;charset=utf-8;' }
+  );
+  const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const tag = [logFilter.spots.size ? spotTag() : '全部車位', { taken: '有車', free: '空位', maint: '維修中' }[logFilter.type] || '全部變化'].join('_');
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'),{
+    href: url,
+    download: `events_${tag}_${day}.csv`
+  }).click();
+  URL.revokeObjectURL(url);
+  toast(`已匯出 ${list.length} 筆事件`, 'ok');
+});
+
+/* ── Floor Plan ─────────────────────────────────────────────────── */
+
+const CAR_SVG = (color) => `<svg width="38" height="56" viewBox="0 0 38 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="5" y="9" width="28" height="38" rx="8" fill="${color}"/>
+  <rect x="9" y="12" width="20" height="10" rx="3" fill="rgba(0,0,0,.2)"/>
+  <rect x="9" y="34" width="20" height="10" rx="3" fill="rgba(0,0,0,.2)"/>
+  <rect x="1" y="13" width="5" height="9" rx="2.5" fill="rgba(0,0,0,.35)"/>
+  <rect x="32" y="13" width="5" height="9" rx="2.5" fill="rgba(0,0,0,.35)"/>
+  <rect x="1" y="34" width="5" height="9" rx="2.5" fill="rgba(0,0,0,.35)"/>
+  <rect x="32" y="34" width="5" height="9" rx="2.5" fill="rgba(0,0,0,.35)"/>
+</svg>`;
+
+const EMPTY_SVG = `<svg width="38" height="56" viewBox="0 0 38 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="5" y="9" width="28" height="38" rx="8" stroke="rgba(42,157,143,.35)" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="19" y="32" font-size="14" font-weight="900" font-family="Inter,sans-serif" text-anchor="middle" fill="rgba(42,157,143,.4)">P</text>
+</svg>`;
+
+const MAINT_SVG = `<svg width="38" height="56" viewBox="0 0 38 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="5" y="9" width="28" height="38" rx="8" stroke="var(--border)" stroke-width="2" stroke-dasharray="5 4"/>
+  <g transform="translate(10 19)" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" transform="scale(.75)"/></g>
+</svg>`;
+
+function buildMapSpot(key) {
+  const occ  = S.occupied[key], dis = S.disabled[key], held = heldUntil(key);
+  const unst = S.unstable[key], lbl = label(key);
+  let cls;
+  if (!S.loaded) cls = 'fp-spot loading';
+  else if (dis)  cls = 'fp-spot dis';
+  else if (occ)  cls = 'fp-spot taken';
+  else if (held) cls = 'fp-spot held';
+  else           cls = 'fp-spot free';
+  const status = !S.loaded ? '讀取中' : dis ? '維修中' : occ ? '有車' : held ? '保留中' : '空位';
+  const icon   = !S.loaded ? '' : dis ? MAINT_SVG : occ ? CAR_SVG('#D64545') : EMPTY_SVG;
+
+  const el = document.createElement('div');
+  el.className = cls;
+  el.innerHTML = `
+    <div class="fp-spot-id">${lbl}</div>
+    <div class="fp-car-area">${icon}</div>
+    <div class="fp-spot-pill">${status}</div>
+    ${S.loaded ? `<div class="fp-spot-dur" data-ago>${agoText()}</div>` : '<div class="fp-spot-dur"></div>'}
+    ${unst ? `<div style="font-size:9px;color:var(--brand);font-weight:700;margin-top:2px">不穩</div>` : ''}
+  `;
+
+  el.addEventListener('click', async () => {
+    if (!S.loaded || dis || denied('parking')) return;
+    const ok = await showModal(
+      `切換車位 ${lbl}`,
+      `確認將車位 ${lbl} 切換為「${occ ? '空位' : '有車'}」？`,
+      { icon: occ ? 'check' : 'car' }
+    );
+    if (!ok) return;
+    set(ref(db, `parking/${key}`), occ ? '0' : '1')
+      .then(() => toast(`車位 ${lbl} 已切換為${occ?'空位':'有車'}`, 'ok'))
+      .catch(err => toast('寫入失敗：' + err.message, 'err'));
+  });
+  return el;
+}
+
+function buildMapGrid(containerId, keys) {
+  const g = document.getElementById(containerId);
+  if (!g) return;
+  g.innerHTML = '';
+  keys.forEach(k => {
+    const spot = buildMapSpot(k);
+    g.appendChild(spot);
+    if (mapFlashKeys.has(k)) {
+      const cls = 'flash-' + (S.occupied[k] ? 'taken' : 'free');
+      setTimeout(() => {
+        spot.classList.add(cls);
+        setTimeout(() => spot.classList.remove(cls), 800);
+      }, 10);
+      mapFlashKeys.delete(k);
+    }
+  });
+}
+
+function renderMap() {
+  const iF = INDOOR.filter(isFree).length;
+  const oF = OUTDOOR.filter(isFree).length;
+  const iC = document.getElementById('map-indoor-count');
+  const oC = document.getElementById('map-outdoor-count');
+  if (iC) iC.textContent = `${S.loaded?iF:'–'} / ${usableOf(INDOOR).length} 空`;
+  if (oC) oC.textContent = `${S.loaded?oF:'–'} / ${usableOf(OUTDOOR).length} 空`;
+  buildMapGrid('map-grid-indoor',  INDOOR);
+  buildMapGrid('map-grid-outdoor', OUTDOOR);
+}
+
+/* ── Tab switching ──────────────────────────────────────────────── */
+const pageTitles = { overview: '總覽', events: '事件紀錄', map: '停車場平面圖' };
+
+function switchTab(tabId) {
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+  const item = document.querySelector(`.sb-item[data-tab="${tabId}"]`);
+  if (item) item.classList.add('active');
+  const sec = document.getElementById('tab-'+tabId);
+  if (sec) sec.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[tabId] || tabId;
+  // sync bottom nav
+  document.querySelectorAll('.bn-item').forEach(x=>x.classList.remove('active'));
+  const bn = document.querySelector(`.bn-item[data-tab="${tabId}"]`);
+  if (bn) bn.classList.add('active');
+  if (tabId==='overview') drawChart(chartHoverX);
+  closeSidebar();
+}
+
+document.querySelectorAll('.sb-item[data-tab]').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+document.querySelectorAll('.bn-item').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+/* ── Chart range buttons ────────────────────────────────────────── */
+document.querySelectorAll('.chart-range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.chart-range-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    chartRange = parseInt(btn.dataset.range);
+    drawChart(chartHoverX);
+  });
+});
+
+/* ── Keyboard shortcuts ─────────────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  if (e.key==='Escape') {
+    if (!document.getElementById('modal-bg').classList.contains('hidden')) {
+      document.getElementById('modal-bg').classList.add('hidden');
+      if (_modalResolve){_modalResolve(false);_modalResolve=null;}
+    }
+    closeSidebar();
+  }
+  if (document.getElementById('login-overlay').classList.contains('hidden')) {
+    if (e.key==='1') switchTab('overview');
+    else if (e.key==='2') switchTab('events');
+    else if (e.key==='3') switchTab('map');
+  }
+});
+</script>
+</body>
+</html>

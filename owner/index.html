@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>業主權限管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23F5B700'/><text x='50' y='73' font-size='66' font-weight='900' font-family='Inter,sans-serif' text-anchor='middle' fill='%231a1200'>P</text></svg>">
+<style>
+/* ── Design Tokens（同管理者後台）──────────────────────────────── */
+:root {
+  --brand:    #F5B700;
+  --free:     #2A9D8F;
+  --taken:    #D64545;
+  --owner:    #7C5CD6;
+  --ink:      #111827;
+  --ink-2:    #374151;
+  --ink-3:    #6B7280;
+  --border:   rgba(0,0,0,0.08);
+  --bg:       #F8FAFC;
+  --surface:  #FFFFFF;
+  --sf2:      #F9FAFB;
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+  --sh-xs: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --sh-md: 0 4px 16px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  --sh-lg: 0 12px 32px rgba(0,0,0,.14), 0 4px 12px rgba(0,0,0,.08);
+}
+body.dark {
+  --owner:  #A48BF0;
+  --ink:    #F9FAFB;
+  --ink-2:  #D1D5DB;
+  --ink-3:  #9CA3AF;
+  --border: rgba(255,255,255,0.08);
+  --bg:     #0D1117;
+  --surface:#161B22;
+  --sf2:    #1F2937;
+  --sh-xs:  0 1px 3px rgba(0,0,0,.4);
+  --sh-md:  0 4px 16px rgba(0,0,0,.4);
+  --sh-lg:  0 12px 32px rgba(0,0,0,.5);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+* { -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg); color: var(--ink);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  transition: background .25s, color .25s;
+}
+button, input, textarea { font-family: inherit; }
+button { cursor: pointer; }
+.hidden { display: none !important; }
+
+/* ── Modal / Toast（同後台）─────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,.5);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+  padding: 32px 28px 26px; width: 100%; max-width: 380px; margin: 16px; box-shadow: var(--sh-lg);
+}
+.modal-icon  { font-size: 30px; text-align: center; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+.modal-msg   { font-size: 13.5px; color: var(--ink-3); text-align: center; line-height: 1.65; margin-bottom: 24px; white-space: pre-wrap; word-break: break-all; }
+.modal-btns  { display: flex; gap: 10px; }
+.modal-cancel, .modal-ok { flex: 1; padding: 11px; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; }
+.modal-cancel { border: 1px solid var(--border); background: var(--sf2); color: var(--ink-2); }
+.modal-ok { border: none; background: var(--ink); color: var(--brand); }
+.modal-ok.danger { background: var(--taken); color: #fff; }
+#toast-wrap {
+  position: fixed; bottom: 24px; right: 24px; left: 24px; z-index: 600; pointer-events: none;
+  display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px;
+}
+.toast {
+  padding: 12px 18px; border-radius: var(--r-md); font-size: 13px; font-weight: 600;
+  box-shadow: var(--sh-md); max-width: 320px; opacity: 0; transform: translateX(16px);
+  transition: opacity .22s, transform .22s;
+}
+.toast.show { opacity: 1; transform: none; }
+.toast-ok   { background: var(--surface); border: 1px solid rgba(42,157,143,.4); color: var(--free); }
+.toast-err  { background: var(--surface); border: 1px solid rgba(214,69,69,.4);  color: var(--taken); }
+.toast-info { background: var(--surface); border: 1px solid var(--border); color: var(--ink-2); }
+
+/* ── Login（同後台）─────────────────────────────────────────────── */
+#login-overlay {
+  position: fixed; inset: 0; z-index: 400; background: var(--bg);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  display: flex; align-items: center; justify-content: center; overflow-y: auto;
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+  padding: 44px 40px; width: 100%; max-width: 400px; margin: 16px; box-shadow: var(--sh-lg);
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.logo {
+  width: 60px; height: 60px; border-radius: 18px; background: var(--brand); color: #1F2933;
+  font-weight: 900; font-size: 34px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(245,183,0,.4); margin-bottom: 4px;
+}
+.login-title { font-size: 24px; font-weight: 800; letter-spacing: -.5px; text-align: center; }
+.login-sub   { font-size: 14px; color: var(--ink-3); margin-top: -8px; margin-bottom: 6px; text-align: center; }
+.field { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.input {
+  width: 100%; padding: 11px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); background: var(--sf2);
+  color: var(--ink); font-size: 16px; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(245,183,0,.18); }
+.btn-main {
+  width: 100%; padding: 13px; border-radius: var(--r-sm); border: none;
+  background: var(--ink); color: var(--brand); font-weight: 700; font-size: 15px;
+}
+.btn-main:disabled { opacity: .45; cursor: not-allowed; }
+#login-error { color: var(--taken); font-size: 13px; min-height: 18px; text-align: center; font-weight: 500; }
+#login-error.ok { color: var(--free); }
+.link-btn {
+  border: none; background: none; padding: 0; font-size: 13px; font-weight: 700;
+  color: var(--ink); text-decoration: underline;
+}
+.login-foot { font-size: 13px; color: var(--ink-3); margin-top: -6px; text-align: center; line-height: 1.7; }
+.login-foot a { color: var(--ink); font-weight: 700; }
+
+/* ── Top bar ────────────────────────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px max(16px, env(safe-area-inset-left)); padding-top: max(12px, env(safe-area-inset-top));
+}
+.top-in { max-width: 920px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.top .logo { width: 36px; height: 36px; border-radius: 10px; font-size: 20px; margin: 0; box-shadow: none; }
+.top-title { font-weight: 800; font-size: 16px; letter-spacing: -.3px; }
+.top-sub { font-size: 12px; color: var(--ink-3); }
+.top-sp { flex: 1; }
+.chip-btn {
+  border: 1px solid var(--border); background: var(--sf2); color: var(--ink-2);
+  padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+}
+.chip-btn:hover { background: var(--border); }
+.chip-btn.danger { color: var(--taken); }
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+main { max-width: 920px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 20px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs); padding: 22px;
+}
+.card-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.card-title { font-size: 16px; font-weight: 800; }
+.card-count { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.card-desc { font-size: 13px; color: var(--ink-3); line-height: 1.6; margin-bottom: 18px; }
+
+/* ── Form ───────────────────────────────────────────────────────── */
+.form { display: grid; gap: 18px; }
+.row2 { display: grid; grid-template-columns: 1.4fr 1fr 0.9fr; gap: 14px; }
+.field small { font-size: 12px; color: var(--ink-3); }
+.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.role-opt { position: relative; }
+.role-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.role-opt label {
+  display: block; height: 100%; padding: 14px; border-radius: var(--r-md);
+  border: 1.5px solid var(--border); background: var(--sf2); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.role-opt label b { display: block; font-size: 14px; margin-bottom: 4px; }
+.role-opt label span { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+.role-opt input:checked + label { border-color: var(--brand); background: rgba(245,183,0,.08); }
+.role-opt input:focus-visible + label { box-shadow: 0 0 0 3px rgba(245,183,0,.25); }
+.perms {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+  padding: 14px; border-radius: var(--r-md); border: 1px dashed var(--border);
+}
+.perm { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; padding: 6px 4px; cursor: pointer; }
+.perm input { width: 18px; height: 18px; accent-color: var(--ink); margin-top: 1px; flex: none; }
+.perm small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+.perm.fixed { cursor: default; opacity: .7; }
+.form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.form-actions .btn-main { width: auto; padding: 11px 22px; }
+#form-msg { font-size: 13px; font-weight: 600; color: var(--taken); }
+
+/* ── List ───────────────────────────────────────────────────────── */
+.list { display: grid; gap: 10px; }
+.item {
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center;
+  padding: 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--sf2);
+}
+.item.editing { border-color: var(--brand); }
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 16px; background: var(--ink); color: var(--brand);
+}
+.avatar.owner { background: var(--owner); color: #fff; }
+.it-mail { font-weight: 700; font-size: 14px; word-break: break-all; }
+.it-note { color: var(--ink-3); font-weight: 500; font-size: 13px; }
+.it-meta { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag {
+  font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+}
+.tag.role-owner  { background: var(--owner); border-color: transparent; color: #fff; }
+.tag.role-admin  { background: var(--ink); border-color: transparent; color: var(--brand); }
+.tag.role-custom { background: rgba(245,183,0,.16); border-color: transparent; color: var(--ink); }
+.tag.expired { background: var(--taken); border-color: transparent; color: #fff; }
+.tag.soon { border-color: var(--taken); color: var(--taken); }
+.item.is-expired .it-mail { text-decoration: line-through; color: var(--ink-3); }
+.list-tools { display: flex; gap: 10px; margin-bottom: 12px; }
+.list-tools .input { padding: 9px 12px; font-size: 14px; }
+.log { display: grid; gap: 2px; max-height: 360px; overflow-y: auto; }
+.log-row { display: grid; grid-template-columns: 128px 1fr; gap: 10px; font-size: 13px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.log-row:last-child { border-bottom: none; }
+.log-time { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.log-what b { font-weight: 700; word-break: break-all; }
+.log-what span { color: var(--ink-3); }
+.it-act { display: flex; gap: 6px; }
+.empty { text-align: center; color: var(--ink-3); font-size: 13.5px; padding: 26px 10px; }
+
+@media (max-width: 640px) {
+  .login-card { padding: 36px 24px; }
+  .row2, .roles, .perms { grid-template-columns: 1fr; }
+  .log-row { grid-template-columns: 1fr; gap: 2px; }
+  .top-sub, .hide-sm { display: none; }
+  .item { grid-template-columns: 36px 1fr; }
+  .avatar { width: 36px; height: 36px; font-size: 14px; }
+  .it-act { grid-column: 1 / -1; justify-content: flex-end; }
+  #toast-wrap { right: 16px; left: 16px; align-items: stretch; }
+  .toast { max-width: none; }
+}
+.ic{display:inline-block;vertical-align:-0.15em;flex:none}
+</style>
+<script>window.ICON={building:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg>',tree:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg>',chart:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20V11M11 20V5M16 20v-6"/></svg>',mic:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',send:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',speaker:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>',copy:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',download:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',logout:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H4"/></svg>',trash:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',wrench:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',car:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16v-5l2-5h10l2 5v5"/><path d="M3 16h18v3H3zM6 19v2M18 19v2"/></svg>',check:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>',key:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>',alert:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>'};</script>
+</head>
+<body>
+
+<!-- 登入 ─────────────────────────────────────────────────────────── -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="logo">P</div>
+    <div class="login-title">業主權限管理</div>
+    <div class="login-sub" id="login-sub">請用業主信箱登入</div>
+    <div class="field">
+      <label class="label" for="login-email">電子郵件</label>
+      <input type="email" id="login-email" class="input" placeholder="owner@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label class="label" for="login-pw">密碼</label>
+      <input type="password" id="login-pw" class="input" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button id="login-btn" class="btn-main">登入</button>
+    <div class="login-foot"><button type="button" class="link-btn" id="login-forgot">忘記密碼？</button></div>
+    <div id="login-error"></div>
+    <div class="login-foot">一般管理者請到 <a href="/">管理者後台</a></div>
+  </div>
+</div>
+
+<!-- 主畫面 ───────────────────────────────────────────────────────── -->
+<header class="top hidden" id="top">
+  <div class="top-in">
+    <div class="logo">P</div>
+    <div>
+      <div class="top-title">業主權限管理</div>
+      <div class="top-sub" id="me"></div>
+    </div>
+    <div class="top-sp"></div>
+    <a class="chip-btn" href="/">前往後台</a>
+    <button class="chip-btn hide-sm" id="btn-dark" type="button">外觀</button>
+    <button class="chip-btn danger" id="btn-logout" type="button">登出</button>
+  </div>
+</header>
+
+<main class="hidden" id="main">
+  <section class="card">
+    <div class="card-h"><div class="card-title" id="form-title">新增授權</div></div>
+    <div class="card-desc">輸入對方的信箱並選擇權限。對方用這個信箱在後台註冊（或登入）並完成信箱驗證後，就能依權限使用。</div>
+    <form class="form" id="form" novalidate>
+      <div class="row2">
+        <div class="field">
+          <label class="label" for="f-email">對方信箱</label>
+          <input type="email" id="f-email" class="input" placeholder="name@example.com" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label class="label" for="f-note">備註（選填）</label>
+          <input type="text" id="f-note" class="input" placeholder="例如：夜班管理員" maxlength="40">
+        </div>
+        <div class="field">
+          <label class="label" for="f-exp">到期日（選填）</label>
+          <input type="date" id="f-exp" class="input">
+          <small>到期當天 23:59 後自動失效</small>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">權限</span>
+        <div class="roles" role="radiogroup">
+          <div class="role-opt">
+            <input type="radio" name="role" id="r-admin" value="admin" checked>
+            <label for="r-admin"><b>管理者</b><span>後台全部功能，不能管理權限</span></label>
+          </div>
+          <div class="role-opt">
+            <input type="radio" name="role" id="r-custom" value="custom">
+            <label for="r-custom"><b>自訂權限</b><span>可以看後台，再勾選能做哪些操作</span></label>
+          </div>
+          <div class="role-opt">
+            <input type="radio" name="role" id="r-owner" value="owner">
+            <label for="r-owner"><b>共同業主</b><span>全部功能，也能進這頁授權給別人</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="perms hidden" id="perms">
+        <label class="perm fixed"><input type="checkbox" checked disabled><span>查看總覽、事件紀錄、平面圖<small>所有授權帳號都有</small></span></label>
+        <label class="perm"><input type="checkbox" value="parking"><span>手動切換有車／空位<small>車位卡片與平面圖的「切換」</small></span></label>
+        <label class="perm"><input type="checkbox" value="maint"><span>設定維修中／恢復<small>車位卡片的「停用」「恢復」</small></span></label>
+        <label class="perm"><input type="checkbox" value="export"><span>匯出 CSV<small>事件紀錄的「匯出 CSV」</small></span></label>
+        <label class="perm"><input type="checkbox" value="clear"><span>清除事件紀錄<small>會刪掉全部事件與維修紀錄</small></span></label>
+      </div>
+      <div class="form-actions">
+        <button class="btn-main" id="f-save" type="submit">新增授權</button>
+        <button class="chip-btn hidden" id="f-cancel" type="button">取消編輯</button>
+        <span id="form-msg" role="alert"></span>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><div class="card-title">已授權的信箱</div><div class="card-count" id="count"></div></div>
+    <div class="card-desc">權限變更會即時套用到對方開著的後台；移除後對方會被登出。</div>
+    <div class="list-tools"><input type="search" id="q" class="input" placeholder="搜尋信箱或備註" aria-label="搜尋信箱或備註"></div>
+    <div class="list" id="list"><div class="empty">讀取中…</div></div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><div class="card-title">操作紀錄</div><div class="card-count">最近 50 筆</div></div>
+    <div class="card-desc">誰在什麼時候新增、修改或移除了哪個信箱的權限。紀錄不能修改或刪除。</div>
+    <div class="log" id="log"><div class="empty">讀取中…</div></div>
+  </section>
+</main>
+
+<div class="modal-bg hidden" id="modal-bg">
+  <div class="modal">
+    <div class="modal-icon" id="modal-icon"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-msg" id="modal-msg"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" id="modal-cancel">取消</button>
+      <button class="modal-ok" id="modal-ok">確認</button>
+    </div>
+  </div>
+</div>
+<div id="toast-wrap"></div>
+
+<script type="module">
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js';
+import { getDatabase, ref, onValue, set, remove, push, query, orderByChild, limitToLast, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider }
+  from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-app-check.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCj1Jeq_Q8mKaLRuCIZU9YocuNs7dMK2CM",
+  authDomain:        "smart-parking-8df51.firebaseapp.com",
+  databaseURL:       "https://smart-parking-8df51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "smart-parking-8df51",
+  storageBucket:     "smart-parking-8df51.firebasestorage.app",
+  messagingSenderId: "982428772229",
+  appId:             "1:982428772229:web:a13805dd604f65198d06ec"
+};
+const app  = initializeApp(firebaseConfig);
+// App Check（同後台）：資料庫若開啟強制驗證，這頁也能用
+try { const t = localStorage.getItem('appCheckDebugToken'); if (t) self.FIREBASE_APPCHECK_DEBUG_TOKEN = t; } catch (e) {}
+initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider('6LdUZv4tAAAAAD22iprZ1eIdtkgLrvGzBBfOIijp'), isTokenAutoRefreshEnabled: true });
+const db   = getDatabase(app);
+const auth = getAuth(app);
+
+// 業主信箱（與 database.rules.json 相同）；access/<信箱把 . 換成 ,> = {email, role, perms, note, expires, seen, by, ts}
+// accessLog/<push> = {ts, by, email, action: add|edit|remove, role}（只能新增）
+const OWNER_EMAIL = 'lixiangsu6@gmail.com';
+const ekey = e => e.toLowerCase().replaceAll('.', ',');
+const ROLE_NAME = { owner: '共同業主', admin: '管理者', custom: '自訂權限' };
+const PERM_NAME = { parking: '切換有車／空位', maint: '維修中／恢復', export: '匯出 CSV', clear: '清除事件' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+
+/* ── Modal / Toast ──────────────────────────────────────────────── */
+let _modalResolve = null;
+function showModal(title, msg, { okLabel = '確認', danger = false, icon = '' } = {}) {
+  return new Promise(resolve => {
+    _modalResolve = resolve;
+    $('modal-icon').innerHTML = (window.ICON && ICON[icon]) || '';
+    $('modal-icon').style.display = icon ? '' : 'none';
+    $('modal-title').textContent = title;
+    $('modal-msg').textContent = msg;
+    $('modal-ok').textContent = okLabel;
+    $('modal-ok').className = 'modal-ok' + (danger ? ' danger' : '');
+    $('modal-bg').classList.remove('hidden');
+  });
+}
+function closeModal(v) {
+  $('modal-bg').classList.add('hidden');
+  if (_modalResolve) { _modalResolve(v); _modalResolve = null; }
+}
+$('modal-ok').addEventListener('click', () => closeModal(true));
+$('modal-cancel').addEventListener('click', () => closeModal(false));
+$('modal-bg').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(false); });
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  $('toast-wrap').appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3200);
+}
+
+/* ── Dark mode（與後台共用 localStorage.dark）──────────────────── */
+let darkMode = false;
+try { darkMode = localStorage.getItem('dark') === '1'; } catch (e) {}
+document.body.classList.toggle('dark', darkMode);
+$('btn-dark').addEventListener('click', () => {
+  darkMode = !darkMode;
+  try { localStorage.setItem('dark', darkMode ? '1' : '0'); } catch (e) {}
+  document.body.classList.toggle('dark', darkMode);
+});
+
+/* ── Auth ───────────────────────────────────────────────────────── */
+function authErr(code) {
+  if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(code)) return '帳號或密碼錯誤';
+  if (code === 'auth/too-many-requests') return '嘗試次數過多，請稍後再試';
+  if (code === 'auth/invalid-email')     return '電子郵件格式不正確';
+  if (code === 'auth/missing-email')     return '請輸入電子郵件';
+  return '登入失敗：' + code;
+}
+function showNotice(text, ok = false) {
+  $('login-error').textContent = text || '';
+  $('login-error').classList.toggle('ok', ok);
+}
+
+let me = null, meUnsub = null, listUnsub = null, logUnsub = null, entries = {}, logs = [];
+let notice = '';
+function stopWatch() {
+  if (meUnsub)   { meUnsub();   meUnsub = null; }
+  if (listUnsub) { listUnsub(); listUnsub = null; }
+  if (logUnsub)  { logUnsub();  logUnsub = null; }
+}
+function kick(text) { notice = text; signOut(auth); }
+
+onAuthStateChanged(auth, user => {
+  stopWatch();
+  if (user && !user.emailVerified) { kick('這個信箱還沒完成驗證，請先到後台按「重新寄驗證信」'); return; }
+  if (!user) {
+    me = null; entries = {}; logs = [];
+    $('login-overlay').classList.remove('hidden');
+    $('top').classList.add('hidden'); $('main').classList.add('hidden');
+    $('login-btn').disabled = false; $('login-btn').textContent = '登入';
+    showNotice(notice); notice = '';
+    resetForm();
+    return;
+  }
+  const email = user.email.toLowerCase();
+  const enter = () => {
+    if (me) return;
+    me = email;
+    $('me').textContent = email + (email === OWNER_EMAIL ? '・業主' : '・共同業主');
+    $('login-overlay').classList.add('hidden');
+    $('top').classList.remove('hidden'); $('main').classList.remove('hidden');
+    listUnsub = onValue(ref(db, 'access'), snap => { entries = snap.val() || {}; renderList(); },
+      err => toast('無法讀取授權名單：' + err.code, 'err'));
+    logUnsub = onValue(query(ref(db, 'accessLog'), orderByChild('ts'), limitToLast(50)), snap => {
+      logs = []; snap.forEach(c => { logs.push(c.val()); }); logs.reverse(); renderLog();
+    }, () => { $('log').innerHTML = '<div class="empty">無法讀取操作紀錄</div>'; });
+  };
+  if (email === OWNER_EMAIL) { enter(); return; }
+  // 共同業主：看自己的授權，被降級或移除就登出
+  meUnsub = onValue(ref(db, `access/${ekey(email)}`), snap => {
+    const exp = snap.child('expires').val();
+    if (snap.child('role').val() === 'owner' && !(typeof exp === 'number' && exp <= Date.now())) enter();
+    else kick('這個網頁只有業主可以使用，一般管理者請到管理者後台');
+  }, () => kick('這個網頁只有業主可以使用，一般管理者請到管理者後台'));
+});
+
+$('login-btn').addEventListener('click', async () => {
+  const email = $('login-email').value.trim(), pw = $('login-pw').value;
+  showNotice('');
+  if (!email || !pw) { showNotice('請輸入帳號和密碼'); return; }
+  $('login-btn').disabled = true; $('login-btn').textContent = '登入中…';
+  try { await signInWithEmailAndPassword(auth, email, pw); }
+  catch (e) { showNotice(authErr(e.code)); $('login-btn').disabled = false; $('login-btn').textContent = '登入'; }
+});
+$('login-forgot').addEventListener('click', async () => {
+  const email = $('login-email').value.trim();
+  if (!email) { showNotice('請先在上方輸入電子郵件，再按「忘記密碼？」'); return; }
+  try { await sendPasswordResetEmail(auth, email); showNotice('已寄出重設信，請到信箱收信', true); }
+  catch (e) { showNotice(e.code === 'auth/user-not-found' ? '查無此電子郵件' : authErr(e.code)); }
+});
+$('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-pw').focus(); });
+$('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+$('btn-logout').addEventListener('click', async () => {
+  if (await showModal('確認登出', '登出後需重新輸入帳號密碼。', { okLabel: '登出', danger: true, icon: 'logout' })) signOut(auth);
+});
+
+/* ── Form ───────────────────────────────────────────────────────── */
+let editKey = null;
+const roleVal = () => document.querySelector('input[name=role]:checked').value;
+const permBoxes = () => [...document.querySelectorAll('#perms input[value]')];
+function syncPerms() { $('perms').classList.toggle('hidden', roleVal() !== 'custom'); }
+document.querySelectorAll('input[name=role]').forEach(r => r.addEventListener('change', syncPerms));
+
+function resetForm() {
+  editKey = null;
+  $('form').reset();
+  $('f-email').disabled = false;
+  $('f-exp').min = dateStr(Date.now());
+  $('form-title').textContent = '新增授權';
+  $('f-save').textContent = '新增授權';
+  $('f-cancel').classList.add('hidden');
+  $('form-msg').textContent = '';
+  syncPerms();
+  renderList();
+}
+$('f-cancel').addEventListener('click', resetForm);
+['f-email', 'f-note', 'f-exp'].forEach(id => $(id).addEventListener('input', () => { $('form-msg').textContent = ''; }));
+// 到期日：本機那天的 23:59:59.999
+const pad = n => String(n).padStart(2, '0');
+const dateStr = ts => { const d = new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const dayEnd = v => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d, 23, 59, 59, 999).getTime(); };
+const isExpired = a => typeof a.expires === 'number' && a.expires <= Date.now();
+const writeLog = (action, email, role) => push(ref(db, 'accessLog'),
+  Object.assign({ ts: serverTimestamp(), by: me, email, action }, role ? { role } : {})).catch(err => console.error('accessLog', err));
+
+function startEdit(key) {
+  const a = entries[key];
+  if (!a) return;
+  editKey = key;
+  $('f-email').value = a.email; $('f-email').disabled = true;
+  $('f-note').value = a.note || '';
+  $('f-exp').value = typeof a.expires === 'number' ? dateStr(a.expires) : '';
+  $('r-' + (ROLE_NAME[a.role] ? a.role : 'custom')).checked = true;
+  permBoxes().forEach(b => { b.checked = !!(a.perms && a.perms[b.value]); });
+  $('form-title').textContent = '編輯授權';
+  $('f-save').textContent = '儲存變更';
+  $('f-cancel').classList.remove('hidden');
+  $('form-msg').textContent = '';
+  syncPerms(); renderList();
+  $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('f-email').value.trim().toLowerCase();
+  const note  = $('f-note').value.trim();
+  const role  = roleVal();
+  const msg   = $('form-msg');
+  msg.textContent = '';
+  if (!/^[^\s@#$,\[\]\/]+@[^\s@#$,\[\]\/]+\.[^\s@#$,\[\]\/]+$/.test(email)) { msg.textContent = '信箱格式不正確'; return; }
+  const expVal = $('f-exp').value;
+  const expires = expVal ? dayEnd(expVal) : null;
+  if (expires !== null && expires <= Date.now()) { msg.textContent = '到期日不能早於今天'; return; }
+  if (email === OWNER_EMAIL) { msg.textContent = '這是業主本人的信箱，已經有全部權限'; return; }
+  const key = ekey(email);
+  if (!editKey && entries[key]) { msg.textContent = '這個信箱已經授權過了，請在下方按「編輯」'; return; }
+  const perms = {};
+  if (role === 'custom') permBoxes().forEach(b => { if (b.checked) perms[b.value] = true; });
+  if (role === 'owner' && !(await showModal('設為共同業主',
+    `${email} 將能使用後台全部功能，\n也能進這一頁新增、修改、移除其他人的權限。`, { okLabel: '確定', icon: 'key' }))) return;
+  if (editKey && key === ekey(me) && role !== 'owner' && !(await showModal('取消自己的業主權限',
+    '儲存後你會失去這一頁的使用權限並被登出。', { okLabel: '仍要儲存', danger: true, icon: 'alert' }))) return;
+  const data = { email, role, by: me, ts: serverTimestamp() };
+  if (Object.keys(perms).length) data.perms = perms;
+  if (note) data.note = note;
+  if (expires !== null) data.expires = expires;
+  if (editKey && typeof entries[editKey].seen === 'number') data.seen = entries[editKey].seen;   // 保留最近登入時間
+  $('f-save').disabled = true;
+  try {
+    const wasEdit = !!editKey;
+    await set(ref(db, `access/${key}`), data);
+    writeLog(wasEdit ? 'edit' : 'add', email, role);
+    toast(editKey ? `已更新 ${email} 的權限` : `已授權給 ${email}`, 'ok');
+    resetForm();
+  } catch (err) {
+    msg.textContent = '儲存失敗：' + (err.code || err.message);
+  } finally { $('f-save').disabled = false; }
+});
+
+/* ── List ───────────────────────────────────────────────────────── */
+const fmtTime = ts => typeof ts === 'number'
+  ? new Date(ts).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  : '';
+function permTags(a) {
+  if (a.role === 'owner') return '<span class="tag role-owner">共同業主</span><span class="tag">全部功能</span><span class="tag">可授權</span>';
+  if (a.role === 'admin') return '<span class="tag role-admin">管理者</span><span class="tag">全部後台功能</span>';
+  const ps = Object.keys(PERM_NAME).filter(p => a.perms && a.perms[p]);
+  return '<span class="tag role-custom">自訂權限</span><span class="tag">查看</span>'
+    + ps.map(p => `<span class="tag">${PERM_NAME[p]}</span>`).join('');
+}
+const fmtAgo = ts => {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  return m < 1 ? '剛剛' : m < 60 ? `${m} 分鐘前` : m < 1440 ? `${Math.floor(m / 60)} 小時前` : `${Math.floor(m / 1440)} 天前`;
+};
+function expTag(a) {
+  if (typeof a.expires !== 'number') return '';
+  if (isExpired(a)) return '<span class="tag expired">已到期</span>';
+  const left = a.expires - Date.now();
+  return `<span class="tag${left < 3 * 864e5 ? ' soon' : ''}">到期 ${fmtTime(a.expires).slice(0, 10)}</span>`;
+}
+function renderList() {
+  const list = $('list');
+  if (!me) return;
+  const q = $('q').value.trim().toLowerCase();
+  const rank = { owner: 0, admin: 1, custom: 2 };
+  const keys = Object.keys(entries).sort((a, b) =>
+    (rank[entries[a].role] ?? 3) - (rank[entries[b].role] ?? 3) || String(entries[a].email).localeCompare(String(entries[b].email)));
+  $('count').textContent = `共 ${keys.length + 1} 人`;
+  const shown = keys.filter(k => !q || String(entries[k].email).includes(q) || String(entries[k].note || '').toLowerCase().includes(q));
+  const ownerRow = `
+    <div class="item">
+      <div class="avatar owner">${esc(OWNER_EMAIL[0].toUpperCase())}</div>
+      <div>
+        <div class="it-mail">${esc(OWNER_EMAIL)}${me === OWNER_EMAIL ? ' <span class="it-note">（你）</span>' : ''}</div>
+        <div class="tags"><span class="tag role-owner">業主</span><span class="tag">全部功能</span><span class="tag">可授權</span></div>
+        <div class="it-meta">固定業主，不能修改或移除</div>
+      </div>
+    </div>`;
+  const showOwner = !q || OWNER_EMAIL.includes(q);
+  list.innerHTML = (showOwner ? ownerRow : '') + (shown.length ? shown.map(k => {
+    const a = entries[k];
+    const by = a.by ? `由 ${esc(a.by)} 授權` : '';
+    const when = fmtTime(a.ts);
+    const seen = typeof a.seen === 'number' ? `最近登入 ${fmtAgo(a.seen)}` : '尚未登入過';
+    return `
+      <div class="item${editKey === k ? ' editing' : ''}${isExpired(a) ? ' is-expired' : ''}">
+        <div class="avatar${a.role === 'owner' ? ' owner' : ''}">${esc(String(a.email || '?')[0].toUpperCase())}</div>
+        <div>
+          <div class="it-mail">${esc(a.email)}${a.note ? ` <span class="it-note">・${esc(a.note)}</span>` : ''}${k === ekey(me) ? ' <span class="it-note">（你）</span>' : ''}</div>
+          <div class="tags">${permTags(a)}${expTag(a)}</div>
+          <div class="it-meta">${[seen, by, when].filter(Boolean).join('・')}</div>
+        </div>
+        <div class="it-act">
+          <button class="chip-btn" type="button" data-edit="${esc(k)}">編輯</button>
+          <button class="chip-btn danger" type="button" data-del="${esc(k)}">移除</button>
+        </div>
+      </div>`;
+  }).join('') : `<div class="empty">${q ? '沒有符合的信箱' : '還沒有授權給任何人，用上方表單新增。'}</div>`);
+}
+$('q').addEventListener('input', renderList);
+setInterval(renderList, 60000);   // 「N 分鐘前」與到期狀態每分鐘更新
+
+const ACT_NAME = { add: '新增', edit: '修改', remove: '移除' };
+function renderLog() {
+  $('log').innerHTML = logs.length ? logs.map(l => `
+    <div class="log-row">
+      <div class="log-time">${esc(fmtTime(l.ts))}</div>
+      <div class="log-what"><span>${esc(l.by)}</span> ${ACT_NAME[l.action] || esc(l.action)} <b>${esc(l.email)}</b>${l.role && l.action !== 'remove' ? ` <span>→ ${ROLE_NAME[l.role] || esc(l.role)}</span>` : ''}</div>
+    </div>`).join('') : '<div class="empty">還沒有任何操作</div>';
+}
+$('list').addEventListener('click', async e => {
+  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+  if (ed) startEdit(ed.dataset.edit);
+  if (!del) return;
+  const k = del.dataset.del, a = entries[k];
+  if (!a) return;
+  const self = k === ekey(me);
+  const ok = await showModal('移除授權',
+    `確認移除 ${a.email} 的全部權限？\n對方開著的後台會被登出。` + (self ? '\n（這是你自己，移除後你也會被登出）' : ''),
+    { okLabel: '移除', danger: true, icon: 'trash' });
+  if (!ok) return;
+  try {
+    await remove(ref(db, `access/${k}`));
+    writeLog('remove', a.email, a.role);
+    if (editKey === k) resetForm();
+    toast(`已移除 ${a.email}`, 'ok');
+  } catch (err) { toast('移除失敗：' + (err.code || err.message), 'err'); }
+});
+</script>
+</body>
+</html>

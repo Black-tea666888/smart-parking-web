@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F2933">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="車位偵測">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<title>雲端載重智慧車位偵測</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+  /* 版面：深色柏油「停車場俯視圖」當主角，下方是摘要、建議、清單；底部固定工具列 */
+  :root{
+    --bg:#EDEFEC; --surface:#FFFFFF; --text:#17202A; --muted:#5B6672; --hair:#DCE0DC;
+    --asphalt:#1F2933; --asphalt-2:#2A3540; --paint:#F5B700; --free:#2A9D8F; --taken:#D64545; --off:#8A94A0;
+    --bar:rgba(255,255,255,.82);
+    --f-num:"Barlow Condensed","DIN Alternate","Arial Narrow",sans-serif;
+    --f-text:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#11161B; --surface:#1A222A; --text:#EEF1F3; --muted:#9AA5B1; --hair:#29323B;
+    --asphalt:#0C1116; --asphalt-2:#18212A; --bar:rgba(26,34,42,.82); color-scheme:dark } }
+  :root[data-theme="dark"]{
+    --bg:#11161B; --surface:#1A222A; --text:#EEF1F3; --muted:#9AA5B1; --hair:#29323B;
+    --asphalt:#0C1116; --asphalt-2:#18212A; --bar:rgba(26,34,42,.82); color-scheme:dark }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--f-text);font-size:15px;line-height:1.5}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+  :focus-visible{outline:2px solid var(--paint);outline-offset:2px;border-radius:6px}
+  .num{font-family:var(--f-num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .wrap{max-width:520px;margin:0 auto;padding-inline:16px}
+
+  /* 頂部 */
+  .top{display:flex;align-items:center;gap:10px;padding-block:calc(env(safe-area-inset-top,0px) + 14px) 12px}
+  .mark{width:30px;height:30px;border-radius:8px;background:var(--paint);color:#1F2933;font:700 20px/30px var(--f-num);text-align:center}
+  .top h1{font-size:17px;font-weight:700;margin:0;letter-spacing:.02em}
+  .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  .live i{width:7px;height:7px;border-radius:50%;background:var(--taken)}
+  .live.on i{background:var(--free);animation:beat 2.4s infinite}
+  @keyframes beat{0%{box-shadow:0 0 0 0 rgba(42,157,143,.55)}70%,100%{box-shadow:0 0 0 7px rgba(42,157,143,0)}}
+
+  /* 主角：停車場俯視圖 */
+  .lot{background:var(--asphalt);border-radius:22px;padding:14px 12px 12px;color:#fff;position:relative;overflow:hidden}
+  .lot::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;
+    background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:5px 5px}
+  .zone{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.62);margin:0 4px 8px}
+  .zone b{color:#fff;font-weight:500}
+  /* 室內：浪板雨棚＋四根柱子 */
+  .canopy{border-radius:14px;padding:26px 6px 6px;position:relative;margin-top:4px;background:linear-gradient(rgba(0,0,0,.28),rgba(255,255,255,.03) 60%);border:1px solid rgba(255,255,255,.14)}
+  .roof{position:absolute;left:-3px;right:-3px;top:-4px;height:20px;border-radius:12px 12px 5px 5px;z-index:1;
+    background:repeating-linear-gradient(90deg,#6B7785 0 5px,#8C98A5 5px 8px,#56616D 8px 11px);box-shadow:0 7px 14px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+  .roof .cl{font-size:11px;font-weight:700;padding:0 8px;background:var(--asphalt);color:rgba(255,255,255,.8);border-radius:6px;line-height:16px}
+  .post{position:absolute;width:9px;height:9px;border-radius:2px;background:#A3AEB9;box-shadow:0 0 0 2px var(--asphalt);z-index:1}
+  .post.bl{left:-5px;bottom:-5px}.post.br{right:-5px;bottom:-5px}
+  /* 室外：露天，旁邊種樹、路燈 */
+  .yard{height:34px;margin-top:8px;border-radius:12px;position:relative;display:flex;align-items:center;justify-content:space-around;padding:0 12px;
+    background:linear-gradient(#22423A,#1B352F);box-shadow:inset 0 2px 0 rgba(255,255,255,.08)}
+  .tree{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 38% 34%,#6CC08A,#3E9461 45%,#24603F 75%);box-shadow:2px 4px 0 rgba(0,0,0,.35)}
+  .tree.s{width:18px;height:18px}
+  .lamp{width:8px;height:8px;border-radius:50%;background:#FFE9A8;box-shadow:0 0 12px 5px rgba(255,214,110,.45)}
+  .row{display:grid;grid-template-columns:repeat(4,1fr)}
+  .bay{position:relative;height:118px;border-left:2px solid rgba(245,183,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px 0 6px;color:#fff;transition:background .3s}
+  .bay:last-child{border-right:2px solid rgba(245,183,0,.7)}
+  .bay:active{background:rgba(255,255,255,.06)}
+  .light{width:10px;height:10px;border-radius:50%;background:var(--off)}
+  .bay.free .light{background:var(--free);box-shadow:0 0 10px 2px rgba(42,157,143,.75)}
+  .bay.taken .light{background:var(--taken);box-shadow:0 0 10px 2px rgba(214,69,69,.7)}
+  .car{width:36px;height:64px;display:block}
+  .bay.arrive .car{animation:park .7s cubic-bezier(.2,.8,.2,1)}
+  @keyframes park{from{transform:translateY(46px);opacity:0}to{transform:none;opacity:1}}
+  .ground{font:600 20px/1 var(--f-num);color:rgba(255,255,255,.88)}
+  .bay.free .ground{color:#7FE0D3}
+  .bay .pmark{font:700 30px/64px var(--f-num);color:rgba(127,224,211,.28);height:64px}
+  .bay.off .pmark{color:rgba(255,255,255,.35);font-size:24px}
+  .bay.mine{background:rgba(245,183,0,.14)}
+  .bay.mine .ground{color:var(--paint)}
+  .bay .tagme{position:absolute;top:24px;left:50%;transform:translateX(-50%);background:var(--paint);color:#1F2933;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;white-space:nowrap}
+  .aisle{height:44px;margin:8px 0;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.5);font-size:12px}
+  .aisle::before,.aisle::after{content:"";flex:1;height:3px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 16px,transparent 16px 28px)}
+  
+  /* 摘要 */
+  .sum{display:flex;align-items:flex-end;gap:14px;padding:18px 4px 6px}
+  .sum .big{font:700 72px/.82 var(--f-num);color:var(--text)}
+  .sum .lbl{padding-bottom:4px}
+  .sum .lbl b{display:block;font-size:17px}
+  .sum .lbl span{font-size:13px;color:var(--muted)}
+  .sum .use{margin-left:auto;text-align:right;padding-bottom:4px;min-width:96px}
+  .sum .use .num{font-size:22px;font-weight:600}
+  .meter{height:4px;border-radius:4px;background:var(--hair);margin-top:6px;overflow:hidden}
+  .meter i{display:block;height:100%;width:0;background:var(--paint);transition:width .5s,background .5s}
+  .stamp{font-size:12px;color:var(--muted);padding:0 4px}
+
+  /* 建議 */
+  .pick{display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin-top:16px;padding:14px 16px;border-radius:18px;background:var(--paint);color:#1F2933}
+  .pick.full{background:var(--taken);color:#fff}
+  .pick.wait{background:var(--hair);color:var(--muted)}
+  .pick .id{font:700 40px/1 var(--f-num);min-width:56px}
+  .pick .t{flex:1}
+  .pick .t b{display:block;font-size:16px}
+  .pick .t span{font-size:13px;opacity:.8}
+  .pick svg{width:22px;height:22px;flex:none}
+
+  /* AI 回答：對話框（尖角指向「問 AI」按鈕） */
+  .aiRow{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-top:10px}
+  .aiBtn{flex:none;padding:10px 16px;border-radius:12px;background:#F5B700;color:#1F2933;font-weight:700;font-size:14px}
+  .aiBtn:disabled{opacity:.6}
+.aiAns{position:relative;align-self:stretch;min-width:0;padding:34px 16px 14px;border-radius:16px;border:1px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,rgba(245,183,0,.85),var(--hair) 55%) border-box;box-shadow:0 6px 20px rgba(245,183,0,.10),0 2px 6px rgba(0,0,0,.06);font-size:14px;line-height:1.7;color:var(--text);overflow-wrap:anywhere;animation:aiIn .3s ease-out}
+.aiAns:empty{display:none}
+.aiAns::before{content:"";position:absolute;top:-7px;left:26px;width:12px;height:12px;background:var(--surface);border-left:1px solid rgba(245,183,0,.85);border-top:1px solid rgba(245,183,0,.85);transform:rotate(45deg)}
+.aiAns::after{content:"AI 助理";position:absolute;top:9px;left:14px;padding:2px 9px;border-radius:999px;background:linear-gradient(135deg,#F5B700,#FFD45C);color:#1F2933;font-size:11px;font-weight:800;letter-spacing:.05em}
+.aiAns.think{color:var(--muted)}
+.aiAns .dots{display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle}
+.aiAns .dots i{width:6px;height:6px;border-radius:50%;background:#F5B700;animation:aiDot 1s ease-in-out infinite}
+.aiAns .dots i:nth-child(2){animation-delay:.15s}
+.aiAns .dots i:nth-child(3){animation-delay:.3s}
+.aiAns .aiSpot{display:inline-block;margin:0 2px;padding:0 7px;border-radius:7px;background:rgba(245,183,0,.18);border:1px solid rgba(245,183,0,.55);color:inherit;font:inherit;font-weight:700;line-height:1.5}
+.aiAns .aiQ{margin-bottom:6px;font-size:12px;color:var(--muted)}
+.aiAns .aiBody.live::after{content:"";display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-2px;background:#F5B700;animation:aiCaret .8s steps(1) infinite}
+.aiAns .aiSpeak{position:absolute;top:6px;right:8px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;font-size:15px;line-height:30px;cursor:pointer;opacity:.75}
+.aiAns .aiSpeak:hover{opacity:1;background:rgba(245,183,0,.15)}
+.aiAsk{display:flex;gap:8px;align-self:stretch;margin-top:8px}
+.aiAsk input{flex:1;min-width:0;padding:10px 14px;border-radius:12px;border:1px solid var(--hair);background:var(--surface);color:var(--text);font:inherit;font-size:16px}
+.aiAsk input:focus{outline:none;border-color:#F5B700;box-shadow:0 0 0 3px rgba(245,183,0,.2)}
+.aiAsk button{flex:none;width:44px;border:0;border-radius:12px;background:#F5B700;color:#1F2933;font-size:16px;font-weight:800;cursor:pointer}
+.aiAsk button:disabled{opacity:.6;cursor:default}
+@keyframes aiCaret{50%{opacity:0}}
+.aiAns.notice::after{content:"AI 提醒"}
+.aiAns.local::after{content:"快速推薦";background:var(--hair);color:var(--text)}
+.aiAns.notice{animation:aiIn .3s ease-out,aiGlow 1.6s ease-out 2}
+.aiAns .aiReset{margin-left:8px;padding:0;border:0;background:none;color:#B88A00;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+@keyframes aiGlow{40%{box-shadow:0 0 0 4px rgba(245,183,0,.35)}}
+@keyframes aiIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes aiDot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-4px);opacity:1}}
+  .aiAns button.aiSpot{cursor:pointer}
+  .aiChips{display:flex;flex-wrap:wrap;gap:6px;align-self:stretch}
+  .aiChips button{padding:6px 12px;border-radius:999px;border:1px solid var(--hair);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer}
+  .aiChips button:hover{border-color:#F5B700}
+  .aiAsk .aiMic{background:var(--hair);color:var(--text)}
+  .aiAsk .aiMic.rec{background:var(--taken);color:#fff;animation:aiGlow 1.2s ease-out infinite}
+
+  .navrow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted)}
+  .navrow .nl{flex:1}
+  .navrow a{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--hair);color:var(--text);font-weight:600;font-size:13px;text-decoration:none}
+  .navrow a svg{width:15px;height:15px}
+  body.show .navrow{display:none!important}
+  /* 我的車 */
+  .mine-card{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--surface);border:1.5px solid var(--paint)}
+  .mine-card .id{font:700 28px/1 var(--f-num);color:var(--text);min-width:40px}
+  .mine-card .t{flex:1;font-size:14px}
+  .mine-card .t span{display:block;font-size:12px;color:var(--muted)}
+  .ghost{font-size:13px;color:var(--muted);padding:8px}
+
+  /* 清單 */
+  h2{font-size:15px;font-weight:700;margin:26px 4px 10px;display:flex;align-items:baseline}
+  h2 small{margin-left:auto;font-weight:400;font-size:13px;color:var(--muted)}
+  .list{background:var(--surface);border-radius:18px;overflow:hidden}
+  .li{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 16px;border-bottom:1px solid var(--hair)}
+  .li:last-child{border-bottom:0}
+  .li .d{width:9px;height:9px;border-radius:50%;background:var(--off);flex:none}
+  .li.free .d{background:var(--free)} .li.taken .d{background:var(--taken)}
+  .li .id{font:600 20px/1 var(--f-num);width:34px}
+  .li .s{flex:1}
+  .li .w{font-size:13px;color:var(--muted)}
+  .li .me{font-size:11px;font-weight:700;background:var(--paint);color:#1F2933;border-radius:10px;padding:1px 7px;margin-left:6px}
+
+  .feed .li{cursor:default}
+  .feed time{font:500 15px/1 var(--f-num);color:var(--muted);width:44px}
+  .empty{padding:16px;color:var(--muted);font-size:14px}
+  /* 尖峰時段（與 App 相同） */
+  .peak{background:var(--surface);border-radius:18px;padding:14px 16px}
+  .peak p{margin:0 0 10px;font-size:13px;color:var(--muted)}
+  .peak .bars{display:flex;align-items:flex-end;gap:2px;height:56px}
+  .peak .bars i{flex:1;min-height:2px;border-radius:2px 2px 0 0;background:var(--free);opacity:.55}
+  .peak .bars i.max{background:var(--taken);opacity:.8} .peak .bars i.now{background:var(--paint);opacity:1}
+  .peak .ax{display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted)}
+  .peak .lg{display:flex;gap:12px;align-items:center;margin-top:6px;font-size:11px;color:var(--muted)}
+  .peak .lg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:-1px;background:var(--paint)}
+  .peak .lg i.max{background:var(--taken)} .peak .lg em{margin-left:auto;font-style:normal;font-size:10px}
+
+  .hint{font-size:12px;color:var(--muted);text-align:center;margin:18px 0 0}
+
+  /* 底部工具列 */
+  .dock{position:fixed;left:0;right:0;bottom:0;padding:8px 16px calc(env(safe-area-inset-bottom,0px) + 8px);background:var(--bar);
+    -webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-top:1px solid var(--hair);z-index:5}
+  .dock .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+  .dock button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);padding:4px 0}
+  .dock svg{width:24px;height:24px}
+  .dock button.on{color:var(--text)}
+  .dock button.on .bell{color:var(--paint)}
+  main{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}
+
+  /* 底部抽屜 */
+  .scrim{position:fixed;inset:0;background:rgba(10,14,18,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:6}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:7;max-width:520px;margin:0 auto;background:var(--surface);border-radius:24px 24px 0 0;
+    padding:10px 20px calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateY(105%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility .3s}
+  .sheet.show{transform:none;visibility:visible}
+  .grab{width:38px;height:5px;border-radius:3px;background:var(--hair);margin:0 auto 14px}
+  .sh{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+  .sh .id{font:700 54px/1 var(--f-num)}
+  .sh .t b{display:block;font-size:17px}
+  .sh .t span{font-size:13px;color:var(--muted)}
+  .kv{display:flex;padding:12px 0;border-top:1px solid var(--hair);font-size:15px}
+  .kv span{color:var(--muted)} .kv b{margin-left:auto;font-weight:500}
+  .acts{display:flex;gap:10px;margin-top:16px}
+  .btn{flex:1;border-radius:14px;padding:14px;font-size:16px;font-weight:700;background:var(--hair);text-align:center}
+  .btn.main{background:var(--paint);color:#1F2933}
+  .fine{font-size:12px;color:var(--muted);margin:12px 0 0}
+
+  .toast{pointer-events:none;position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);transform:translate(-50%,24px);opacity:0;z-index:8;
+    background:#1F2933;color:#fff;padding:11px 16px;border-radius:14px;font-size:14px;transition:.25s;max-width:calc(100vw - 32px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .toast.show{transform:translate(-50%,0);opacity:1}
+  /* 導引路線 */
+  .route{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}
+  .route path{fill:none;stroke:var(--paint);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:6 9;animation:march .6s linear infinite}
+  .route .halo{fill:none;stroke:rgba(245,183,0,.25);stroke-width:12;stroke-dasharray:none;animation:none}
+  .route circle{fill:var(--paint)}
+  .route .ping{fill:none;stroke:var(--paint);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:ping 1.4s ease-out infinite}
+  @keyframes march{to{stroke-dashoffset:-15}}
+  @keyframes ping{from{transform:scale(.6);opacity:1}to{transform:scale(2.4);opacity:0}}
+  .bay.target{background:rgba(245,183,0,.16)}
+  .gate{order:-1;font-size:11px;font-weight:700;color:#1F2933;background:var(--paint);border-radius:6px;padding:2px 6px;flex:none}
+  .aisle.full em{font-style:normal;color:#fff;background:var(--taken);border-radius:20px;padding:3px 10px;font-weight:700}
+  .aisle em{font-style:normal}
+  /* 載入骨架 */
+  .lot.wait .bay{opacity:1;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.08) 50%,transparent 100%);background-size:200% 100%;animation:shimmer 1.2s infinite}
+  @keyframes shimmer{from{background-position:150% 0}to{background-position:-50% 0}}
+  /* 離線提示 */
+  .offline{margin:0 0 10px;padding:9px 12px;border-radius:12px;background:rgba(214,69,69,.12);color:var(--taken);font-size:13px}
+  /* 使用率走勢 */
+  .spark{display:block;width:100%;height:26px;margin-top:4px}
+  .spark polyline{fill:none;stroke:var(--paint);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .spark circle{fill:var(--paint)}
+  /* 車位詳情的變化紀錄 */
+  .hist{margin-top:4px;border-top:1px solid var(--hair);padding-top:10px}
+  .hist p{margin:0 0 6px;font-size:13px;color:var(--muted)}
+  .hist .e{display:flex;align-items:center;gap:10px;font-size:14px;padding:4px 0}
+  .hist .e time{font:500 15px/1 var(--f-num);color:var(--muted);width:64px}
+  .hist .e i{width:8px;height:8px;border-radius:50%}
+  .btn.line{background:none;border:1.5px solid var(--hair)}
+  /* 保留車位 */
+  .bay.held,.bay.myheld{background:repeating-linear-gradient(135deg,rgba(245,183,0,.10) 0 8px,transparent 8px 16px)}
+  .bay.held .light,.bay.myheld .light{background:var(--paint);box-shadow:0 0 10px 2px rgba(245,183,0,.7)}
+  .bay .lock{display:flex;flex-direction:column;align-items:center;justify-content:center;height:64px;gap:2px;color:var(--paint)}
+  .bay .lock svg{width:20px;height:20px}
+  .bay .lock .num{font-size:16px;font-weight:600}
+  .bay.held .ground{color:rgba(255,255,255,.6)}
+  .li.held .d,.li.myheld .d{background:var(--paint)}
+  .li .cd{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+  .hold-card{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--surface);border:1.5px dashed var(--paint)}
+  .hold-card .id{font:700 28px/1 var(--f-num);min-width:40px}
+  .hold-card .t{flex:1;font-size:14px}
+  .hold-card .t span{display:block;font-size:12px;color:var(--muted)}
+  .hold-card .cd{font:700 26px/1 var(--f-num);color:var(--paint);font-variant-numeric:tabular-nums}
+  .acts.one{margin-top:10px}
+  .btn.hold{background:none;border:1.5px dashed var(--paint);color:var(--text)}
+  /* 首次使用說明 */
+  .intro{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-end;justify-content:center;background:rgba(10,14,18,.55);padding:16px}
+  .intro .card{width:100%;max-width:480px;background:var(--surface);border-radius:24px;padding:24px 22px calc(env(safe-area-inset-bottom,0px) + 18px)}
+  .intro h3{margin:0 0 4px;font-size:22px}
+  .intro .lead{margin:0 0 16px;color:var(--muted);font-size:14px}
+  .intro .r{display:flex;gap:14px;align-items:flex-start;padding:10px 0}
+  .intro .ic{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;background:var(--asphalt);color:var(--paint)}
+  .intro .ic svg{width:22px;height:22px}
+  .intro .r b{display:block;font-size:15px}
+  .intro .r span{font-size:13px;color:var(--muted)}
+  .intro .btn{width:100%;margin-top:14px}
+  .installbtn{font-size:12px;font-weight:700;background:var(--paint);color:#1F2933;border-radius:20px;padding:4px 10px;margin-left:8px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  /* iPad、Mac 等大螢幕：左邊停車場、右邊資訊，工具列浮在底部中央 */
+  @media (hover:hover){
+    .bay:hover{background:rgba(255,255,255,.06)} .li:hover{background:var(--hair)} .pick:hover{filter:brightness(1.04)}
+  }
+  @media (min-width:760px){
+    .wrap{max-width:1180px;padding-inline:28px}
+    .cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:start}
+    .colA{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+    .top{padding-block:calc(env(safe-area-inset-top,0px) + 22px) 18px}
+    .top h1{font-size:20px}
+    .lot{padding:22px 20px 18px;border-radius:28px}
+    .bay{height:168px}
+    .car{width:50px;height:88px}
+    .bay .pmark{font-size:42px;line-height:88px;height:88px}
+    .bay .lock{height:88px}
+    .ground{font-size:26px}
+    .aisle{height:60px}
+    .sum{padding-top:4px}
+    .sum .big{font-size:88px}
+    .pick{margin-top:14px}
+    main{padding-bottom:120px}
+    .dock{left:50%;right:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);width:420px;border-radius:22px;border:1px solid var(--hair);box-shadow:0 12px 40px rgba(0,0,0,.18);padding:8px 12px}
+    .toast{bottom:calc(env(safe-area-inset-bottom,0px) + 100px)}
+    .sheet{left:50%;right:auto;bottom:auto;top:50%;width:460px;max-width:calc(100vw - 48px);border-radius:24px;padding:24px;
+      transform:translate(-50%,-46%) scale(.98);opacity:0;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s,visibility .25s}
+    .sheet.show{transform:translate(-50%,-50%);opacity:1}
+    .grab{display:none}
+    .intro{align-items:center}
+  }
+  @media (min-width:1100px){ .cols{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:36px} .bay{height:190px} }
+  /* 展示模式（?show）：專題展攤位用的大螢幕畫面 */
+  .credit{font-size:12px;color:var(--muted);text-align:center;margin:14px 0 0;opacity:.8}
+  body:not(.show) .showonly{display:none!important}
+  body.show{--bg:#11161B;--surface:#1A222A;--text:#EEF1F3;--muted:#9AA5B1;--hair:#29323B;--asphalt:#0C1116;--asphalt-2:#18212A;color-scheme:dark;overflow:hidden}
+  body.show .dock,body.show .pick,body.show .hold-card,body.show .mine-card,body.show #listH,body.show #list,body.show .hint,body.show .credit,body.show .installbtn,body.show .stamp{display:none!important}
+  body.show main{padding:0;height:100vh}
+  body.show .wrap{max-width:none;padding:clamp(16px,2.4vw,40px)}
+  body.show .top{padding-block:0 clamp(12px,2vh,24px)}
+  body.show .top h1{font-size:clamp(22px,2.4vw,38px)}
+  body.show .mark{width:clamp(34px,3vw,52px);height:clamp(34px,3vw,52px);line-height:clamp(34px,3vw,52px);font-size:clamp(22px,2vw,34px);border-radius:12px}
+  body.show .ev{font-size:clamp(13px,1.1vw,18px);color:var(--paint);font-weight:700;margin-left:6px}
+  body.show .live{font-size:clamp(14px,1.1vw,18px)}
+  body.show .cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:clamp(16px,2.4vw,40px);align-items:stretch}
+  body.show .colA{position:static}
+  body.show .lot{border-radius:28px;padding:clamp(16px,2vw,28px)}
+  body.show .bay{height:clamp(140px,26.5vh,330px)}
+  body.show .car{width:clamp(50px,4.6vw,80px);height:clamp(88px,8.2vw,142px)}
+  body.show .bay .pmark{font-size:clamp(42px,4vw,72px);line-height:clamp(88px,8.2vw,142px);height:clamp(88px,8.2vw,142px)}
+  body.show .bay .lock{height:clamp(88px,8.2vw,142px)} body.show .bay .lock svg{width:32px;height:32px} body.show .bay .lock .num{font-size:24px}
+  body.show .ground{font-size:clamp(26px,2.4vw,42px)}
+  body.show .light{width:16px;height:16px}
+  body.show .canopy{padding-top:36px} body.show .roof{height:28px} body.show .roof .cl{font-size:14px;line-height:20px}
+  body.show .yard{height:clamp(40px,6vh,64px)} body.show .tree{width:clamp(28px,2.6vw,44px);height:clamp(28px,2.6vw,44px)} body.show .tree.s{width:clamp(22px,2vw,34px);height:clamp(22px,2vw,34px)}
+  body.show .zone{font-size:clamp(13px,1.1vw,18px)}
+  body.show .aisle{height:clamp(52px,8vh,90px);font-size:clamp(13px,1.1vw,18px)}
+  body.show .gate{font-size:clamp(13px,1.1vw,18px);padding:4px 10px}
+  body.show .colB{display:flex;flex-direction:column;gap:clamp(12px,1.6vh,22px);min-height:0}
+  body.show .sum{background:var(--surface);border-radius:24px;padding:clamp(18px,2vw,30px)}
+  body.show .sum .big{font-size:clamp(110px,15vh,200px);color:var(--free)}
+  body.show .sum .lbl b{font-size:clamp(20px,1.8vw,30px)} body.show .sum .lbl span{font-size:clamp(13px,1vw,17px)}
+  body.show .sum .use .num{font-size:clamp(26px,2.4vw,40px)}
+  body.show #feedBox{display:block!important;flex:1;min-height:0;overflow:hidden}
+  body.show #feedBox h2{margin-top:0;font-size:clamp(16px,1.3vw,22px)}
+  body.show .feed .li{font-size:clamp(15px,1.2vw,20px);padding:clamp(10px,1.4vh,16px) 18px}
+  body.show .feed time{font-size:clamp(17px,1.3vw,22px);width:60px}
+  body.show .feed .li.new{animation:flash 1.6s ease-out}
+  @keyframes flash{from{background:rgba(245,183,0,.28)}to{background:transparent}}
+  .scan{display:flex;gap:clamp(14px,1.6vw,24px);align-items:center;background:var(--paint);color:#1F2933;border-radius:24px;padding:clamp(14px,1.6vw,22px)}
+  .scan img{width:clamp(110px,10vw,170px);height:auto;background:#fff;border-radius:12px;padding:8px;flex:none}
+  .scan b{display:block;font-size:clamp(20px,1.8vw,30px);line-height:1.25}
+  .scan span{display:block;font-size:clamp(13px,1vw,17px);margin-top:6px;opacity:.85;line-height:1.5}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(10px,1vw,16px)}
+  .kpis div{background:var(--surface);border-radius:20px;padding:clamp(12px,1.4vw,20px)}
+  .kpis b{display:block;font-size:clamp(34px,3.4vw,56px);line-height:1;font-weight:600}
+  .kpis span{font-size:clamp(12px,.95vw,16px);color:var(--muted)}
+  .clock{font:600 clamp(18px,1.6vw,28px)/1 var(--f-num);color:var(--muted);margin-left:14px;font-variant-numeric:tabular-nums}
+  .team{font-size:clamp(12px,.95vw,16px);color:var(--muted);text-align:right}
+  .fsbtn{font-size:13px;color:var(--muted);border:1px solid var(--hair);border-radius:20px;padding:4px 12px;margin-left:12px}
+  @media (max-width:900px){ body.show{overflow:auto} body.show main{height:auto} body.show .cols{grid-template-columns:1fr} body.show .bay{height:150px} }
+  /* 3D 立體視角：整個停車場往後傾，車子、柱子、雨棚、路燈立起來 */
+  .stage{perspective:1100px;perspective-origin:50% -20%}
+  .roof3,.pole{display:none}
+  .lot.d3{--rx:32deg;--rz:0deg;--sc:1;transform:scale(var(--sc)) rotateX(var(--rx)) rotateZ(var(--rz));transform-origin:50% 100%;transform-style:preserve-3d;overflow:visible;margin-top:-6px;
+    box-shadow:0 2px 0 #0A0E12,0 4px 0 #0A0E12,0 6px 0 #0A0E12,0 8px 0 #0A0E12,0 40px 50px rgba(0,0,0,.35);transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+  .lot.d3 .canopy,.lot.d3 .row,.lot.d3 .bay,.lot.d3 .yard{transform-style:preserve-3d}
+  .lot.d3 .roof{display:none}
+  .lot.d3 .canopy{padding-top:10px;margin-top:10px}
+  .lot.d3 .car{transform:translateZ(14px);filter:drop-shadow(0 10px 5px rgba(0,0,0,.55))}
+  .lot.d3 .bay.arrive .car{animation:park3 .8s cubic-bezier(.2,.8,.2,1)}
+  @keyframes park3{from{transform:translate3d(0,46px,14px);opacity:0}to{transform:translateZ(14px);opacity:1}}
+  .lot.d3 .light{transform:translateZ(5px)}
+  .lot.d3 .bay .lock{transform:translateZ(10px)}
+  .lot.d3 .route{transform:translateZ(2px)}
+  .lot.d3 .roof3{display:flex;position:absolute;inset:-6px;transform:translateZ(56px);border-radius:12px;pointer-events:none;align-items:flex-start;justify-content:center;
+    background:repeating-linear-gradient(90deg,rgba(140,152,165,.20) 0 6px,rgba(220,226,232,.16) 6px 9px,rgba(90,100,112,.20) 9px 13px);
+    border:2px solid rgba(190,200,210,.75);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+  .lot.d3 .roof3 span{margin-top:6px;font-size:11px;font-weight:700;background:rgba(15,20,25,.85);color:#fff;border-radius:6px;padding:1px 8px}
+  .lot.d3 .pole{display:block;position:absolute;width:6px;height:56px;background:linear-gradient(90deg,#7B8794,#C3CCD5,#7B8794);transform-origin:top;transform:rotateX(90deg);pointer-events:none;border-radius:2px}
+  .pole.p1{left:-6px;top:-6px}.pole.p2{right:-6px;top:-6px}.pole.p3{left:-6px;top:calc(100% + 6px)}.pole.p4{right:-6px;top:calc(100% + 6px)}
+  .lot.d3 .tree{transform:translateZ(22px);box-shadow:none;filter:drop-shadow(4px 12px 4px rgba(0,0,0,.45))}
+  .lot.d3 .lamp{position:relative;transform:translateZ(34px);transform-style:preserve-3d}
+  .lot.d3 .lamp::before{content:"";position:absolute;left:3px;top:4px;width:2px;height:34px;background:#AEB8C2;transform-origin:top;transform:rotateX(-90deg)}
+  .viewbtn{font:600 12px/1 var(--f-text);color:var(--muted);border:1px solid var(--hair);border-radius:20px;padding:5px 10px;margin-left:8px}
+  @keyframes sway{0%,100%{transform:scale(var(--sc)) rotateX(var(--rx)) rotateZ(calc(var(--rz) - 3deg))}50%{transform:scale(var(--sc)) rotateX(calc(var(--rx) + 4deg)) rotateZ(calc(var(--rz) + 3deg))}}
+  body.show .lot.d3{animation:sway 16s ease-in-out infinite;margin-top:-10px}
+  body.show .lot.d3.touched{animation:none}
+  body.show .lot.d3 .roof3,body.show .lot.d3 .pole{height:auto}
+  body.show .lot.d3 .pole{height:100px} body.show .lot.d3 .roof3{transform:translateZ(100px)} body.show .lot.d3 .roof3 span{font-size:15px}
+  /* 立體導引：地面路線＋移動光點＋目標光柱＋浮空標記 */
+  .g3{position:absolute;inset:0;pointer-events:none;z-index:3;transform-style:preserve-3d}
+  .g3 .runner{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:radial-gradient(circle,#FFF6D6 0 30%,#F5B700 60%);box-shadow:0 0 14px 6px rgba(245,183,0,.55)}
+  .g3 .pillar,.g3 .pin,.g3 .rings{display:none}
+  .lot.d3 .g3{transform:translateZ(1px)}
+  .lot.d3 .g3 .runner{transform:translateZ(12px);filter:drop-shadow(0 10px 4px rgba(0,0,0,.5))}
+  .lot.d3 .g3 .pillar{display:block;position:absolute;width:56px;margin-left:-28px;height:120px;transform-origin:top center;transform:rotateX(90deg);
+    background:linear-gradient(rgba(245,183,0,.6),rgba(245,183,0,.18) 55%,rgba(245,183,0,0));border-radius:28px 28px 0 0;animation:glow 1.6s ease-in-out infinite}
+  .lot.d3 .g3 .pillar::after{content:"";position:absolute;left:50%;top:0;width:3px;height:100%;margin-left:-1.5px;background:linear-gradient(#FFF3C4,rgba(255,243,196,0))}
+  @keyframes glow{50%{opacity:.6}}
+  .lot.d3 .g3 .pin{display:block;position:absolute;transform-style:preserve-3d;transform:translateZ(130px)}
+  .lot.d3 .g3 .pin b{display:block;transform:translate(-50%,-100%) rotateZ(calc(-1 * var(--rz))) rotateX(calc(-1 * var(--rx)));transform-origin:50% 100%;background:var(--paint);color:#1F2933;font:700 22px/1 var(--f-num);padding:7px 12px 6px;border-radius:12px;
+    box-shadow:0 10px 24px rgba(0,0,0,.45);white-space:nowrap;animation:bob 1.4s ease-in-out infinite}
+  .lot.d3 .g3 .pin b::after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:var(--paint)}
+  @keyframes bob{50%{transform:translate(-50%,-100%) rotateZ(calc(-1 * var(--rz))) rotateX(calc(-1 * var(--rx))) translateY(-10px)}}
+  .lot.d3 .g3 .rings{display:block;position:absolute;width:0;height:0}
+  .lot.d3 .g3 .rings i{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;border:2px solid var(--paint);animation:ring 1.8s ease-out infinite;opacity:0}
+  .lot.d3 .g3 .rings i:nth-child(2){animation-delay:.6s}.lot.d3 .g3 .rings i:nth-child(3){animation-delay:1.2s}
+  @keyframes ring{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+  .lot.d3.focus{transform:scale(var(--sc)) rotateX(calc(var(--rx) + 8deg)) rotateZ(var(--rz))}
+  body.show .lot.d3 .g3 .pillar{height:200px;width:80px;margin-left:-40px;background:linear-gradient(rgba(245,183,0,.8),rgba(245,183,0,.3) 55%,rgba(245,183,0,0))} body.show .lot.d3 .g3 .pin{transform:translateZ(185px)} body.show .lot.d3 .g3 .pin b{font-size:32px;padding:10px 16px 8px}
+  /* 視角操作 */
+  .stage{position:relative;touch-action:pan-y}
+  .stage.grab3{cursor:grab} .stage.grabbing{cursor:grabbing}
+  .resetview{position:absolute;right:10px;top:-2px;z-index:4;font-size:12px;font-weight:700;background:var(--surface);color:var(--text);border:1px solid var(--hair);border-radius:20px;padding:5px 10px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  /* 導引中：結束按鈕 */
+  .endguide{display:flex;align-items:center;gap:8px;margin:12px auto 0;font-size:14px;font-weight:700;background:var(--paint);color:#1F2933;border-radius:22px;padding:9px 16px;box-shadow:0 6px 18px rgba(245,183,0,.35)}
+  .endguide i{width:8px;height:8px;border-radius:50%;background:#1F2933;animation:beat 1.6s infinite}
+  /* 車子離開的動畫 */
+  .ghostcar{position:absolute;left:50%;top:50%;margin:-32px 0 0 -18px;pointer-events:none;transform-style:preserve-3d}
+  .ghostcar .car{animation:leaveIn 1s cubic-bezier(.5,0,.8,.4) forwards}
+  .ghostcar.out .car{animation-name:leaveOut}
+  @keyframes leaveIn{from{transform:translate3d(0,0,14px);opacity:1}to{transform:translate3d(0,80px,14px);opacity:0}}
+  @keyframes leaveOut{from{transform:translate3d(0,0,14px);opacity:1}to{transform:translate3d(0,-80px,14px);opacity:0}}
+  @media (min-width:760px){ .ghostcar{margin:-44px 0 0 -25px} }
+  /* 離場確認 */
+  .ask{display:flex;align-items:center;gap:10px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--surface);border:1.5px solid var(--free)}
+  .ask span{flex:1;font-size:14px} .ask button{font-size:13px;font-weight:700;padding:7px 12px;border-radius:12px;background:var(--hair)}
+  .ask button.y{background:var(--free);color:#fff}
+  /* 日夜場景 */
+  .lot{isolation:isolate} .lot::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;z-index:-1;transition:background 1s}
+  .lot.day::before{background:linear-gradient(135deg,rgba(255,236,190,.12),transparent 55%)}
+  .lot.day .car{filter:drop-shadow(5px 7px 2px rgba(0,0,0,.45))}
+  .lot.d3.day .car{filter:drop-shadow(10px 14px 4px rgba(0,0,0,.5))}
+  .lot.night::before{background:radial-gradient(120% 80% at 50% 110%,rgba(255,200,110,.10),transparent 60%),linear-gradient(rgba(8,16,40,.38),rgba(8,16,40,.38))}
+  .lot.night .lamp{box-shadow:0 0 16px 7px rgba(255,214,110,.7),0 0 70px 34px rgba(255,214,110,.20)}
+  .lot.night .car{filter:drop-shadow(0 -5px 6px rgba(255,236,170,.6))}
+  .lot.d3.night .car{filter:drop-shadow(0 -6px 8px rgba(255,236,170,.6)) drop-shadow(0 10px 5px rgba(0,0,0,.5))}
+  .lot.night .canopy{box-shadow:inset 0 0 50px rgba(255,220,150,.14)}
+  .lot.night .roof3{box-shadow:0 0 0 1px rgba(0,0,0,.4),inset 0 0 40px rgba(255,220,150,.18)}
+  .sky{font-style:normal;margin-left:6px;opacity:.8}
+  /* 色弱友善：燈號用形狀區分（圓＝空位、方＝有車、菱形＝保留、空心＝維修） */
+  .bay.taken .light,.li.taken .d{border-radius:2px}
+  .bay.held .light,.bay.myheld .light,.li.held .d,.li.myheld .d{border-radius:1px;transform:rotate(45deg) scale(.85)}
+  .lot.d3 .bay.held .light,.lot.d3 .bay.myheld .light{transform:translateZ(5px) rotate(45deg) scale(.85)}
+  .bay.off .light,.li.off .d{background:transparent!important;box-shadow:inset 0 0 0 2px var(--off)!important}
+  .legend{display:flex;justify-content:center;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{width:9px;height:9px;display:block}
+  .legend .f{border-radius:50%;background:var(--free)} .legend .t{border-radius:2px;background:var(--taken)}
+  .legend .h{border-radius:1px;background:var(--paint);transform:rotate(45deg) scale(.85)} .legend .o{border-radius:50%;box-shadow:inset 0 0 0 2px var(--off)}
+  body.show .legend{font-size:clamp(13px,1vw,17px)}
+  /* 大字模式、高對比 */
+  html.big main{zoom:1.16} html.big .dock,html.big .sheet,html.big .toast{zoom:1.12}
+  @media (prefers-contrast: more){ :root{--muted:#3A4651;--hair:#B9C0C7} .lot .ground{color:#fff!important} .zone,.aisle{color:rgba(255,255,255,.85)!important} .bay{border-left-width:3px} }
+  .iconbtn{font:700 12px/1 var(--f-text);color:var(--muted);border:1px solid var(--hair);border-radius:20px;padding:5px 9px;margin-left:6px}
+  .iconbtn[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+  /* 互動式新手導覽 */
+  .coach{position:fixed;inset:0;z-index:12}
+  .coach .hole{position:fixed;border-radius:18px;box-shadow:0 0 0 9999px rgba(8,12,16,.62);transition:all .35s cubic-bezier(.2,.8,.2,1);pointer-events:none;outline:2px solid var(--paint);outline-offset:2px}
+  .coach .tip{position:fixed;width:min(330px,calc(100vw - 32px));background:var(--surface);color:var(--text);border-radius:18px;padding:16px 16px 12px;box-shadow:0 16px 40px rgba(0,0,0,.35);transition:top .35s,left .35s,opacity .2s}
+  .coach .tip b{display:block;font-size:17px;margin-bottom:4px}
+  .coach .tip > span{display:block;font-size:14px;color:var(--muted);line-height:1.55}
+  .coach .cb{display:flex;align-items:center;gap:10px;margin-top:14px}
+  .coach .cb .skip{font-size:13px;color:var(--muted);padding:8px 4px}
+  .coach .cb .n{margin-left:auto;font:600 14px/1 var(--f-num);color:var(--muted)}
+  .coach .cb .btn{flex:none;padding:10px 18px;font-size:15px}
+  .top h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto}
+  .top > *{flex-shrink:0} .top h1{flex-shrink:1}
+  .t-short{display:none}
+  @media (max-width:480px){ .t-long{display:none} .t-short{display:inline} }
+  main{overflow-x:clip}
+  @media (max-width:440px){ .top{gap:6px} .top h1{font-size:16px} #liveText{display:none} .viewbtn,.iconbtn{padding:5px 8px;margin-left:2px} }
+  body.show #bBig{display:none}
+  .iconbtn.mode{display:inline-flex;align-items:center;gap:4px}
+  .iconbtn.mode svg{width:14px;height:14px}
+  :root,body,.list,.sum,.lot{transition:background-color .4s,color .4s}
+  [hidden]{display:none!important}
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+.ic{display:inline-block;vertical-align:-0.15em;flex:none}
+</style>
+<script>window.ICON={building:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M10 21v-3h4v3"/></svg>',tree:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-6"/><path d="M12 3l6 8h-3l4 5H5l4-5H6z"/></svg>',chart:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M6 20V11M11 20V5M16 20v-6"/></svg>',mic:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',send:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',speaker:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>',copy:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',download:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',logout:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 17l5-5-5-5M15 12H4"/></svg>',trash:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',wrench:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',car:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16v-5l2-5h10l2 5v5"/><path d="M3 16h18v3H3zM6 19v2M18 19v2"/></svg>',check:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>',key:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>',alert:'<svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>'};</script>
+</head>
+<body>
+<main class="wrap">
+  <div class="top">
+    <div class="mark" aria-hidden="true">P</div>
+    <h1><span class="t-long">雲端載重智慧車位偵測</span><span class="t-short">智慧車位</span></h1>
+    <button class="viewbtn" id="b3d" aria-pressed="true">2D</button><button class="iconbtn mode" id="bMode" aria-label="白天／夜晚模式"></button><button class="iconbtn" id="bBig" aria-pressed="false" aria-label="大字模式">Aa</button><button class="iconbtn showonly" id="bSound" aria-pressed="false">音效</button>
+    <div class="live" id="live"><i></i><span id="liveText">連線中</span></div>
+    <button class="installbtn" id="installBtn" hidden>安裝</button>
+    <span class="clock showonly" id="clock"></span><button class="fsbtn showonly" id="fsBtn" hidden>全螢幕</button>
+  </div>
+
+  <div class="cols"><div class="colA">
+  <div class="offline" id="offline" hidden>連線中斷，畫面是最後收到的資料，恢復後會自動更新</div>
+  <div class="stage" id="stage"><button class="resetview" id="resetView" hidden>重設視角</button><section class="lot wait" id="lot" aria-label="停車場平面圖">
+    <svg class="route" id="route" aria-hidden="true"></svg>
+    <div class="g3" id="g3" aria-hidden="true" hidden><i class="runner" id="runner"></i><span class="rings" id="rings"><i></i><i></i><i></i></span><i class="pillar" id="pillar"></i><span class="pin" id="pin"><b id="pinT"></b></span></div>
+    <div class="zone"><span>室內</span><b id="zIn">–</b></div>
+    <div class="canopy"><div class="roof" aria-hidden="true"><span class="cl">雨棚</span></div><i class="post bl"></i><i class="post br"></i><div class="row" id="rowIn"></div><div class="roof3" aria-hidden="true"><span>雨棚</span></div><i class="pole p1"></i><i class="pole p2"></i><i class="pole p3"></i><i class="pole p4"></i></div>
+    <div class="aisle" id="aisle"><span class="gate" id="gate">入口</span><em id="aisleText">車道 →</em></div>
+    <div class="row" id="rowOut"></div>
+    <div class="yard" aria-hidden="true"><i class="tree"></i><i class="lamp"></i><i class="tree s"></i><i class="tree"></i><i class="lamp"></i><i class="tree s"></i><i class="tree"></i></div>
+    <div class="zone" style="margin:8px 4px 0"><span>室外・露天<em class="sky" id="sky"></em></span><b id="zOut">–</b></div>
+  </section></div>
+  <div class="legend" aria-hidden="true"><span><i class="f"></i>空位</span><span><i class="t"></i>有車</span><span><i class="h"></i>保留</span><span><i class="o"></i>維修</span></div>
+  <button class="endguide" id="endGuide" hidden><i></i><span id="endGuideT">導引中・停好會自動結束</span>　結束</button>
+  </div><div class="colB">
+
+  <div class="sum">
+    <div class="big num" id="free">–</div>
+    <div class="lbl"><b>個空位</b><span id="usable">共 8 格</span></div>
+    <div class="use"><span class="num" id="pct">–</span><span style="font-size:12px;color:var(--muted)"> 使用率</span><svg class="spark" id="spark" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"></svg><div class="meter"><i id="meter"></i></div></div>
+  </div>
+  <div class="stamp" id="stamp">讀取中…</div>
+  <div class="ask" id="ask" hidden><span id="askT"></span><button class="y" id="askYes">已離場</button><button id="askNo">不是我</button></div>
+  <div class="kpis showonly"><div><b class="num" id="kStay">–</b><span>平均停車（分鐘）</span></div><div><b class="num" id="kMoves">0</b><span>開機後進出次數</span></div><div><b class="num" id="kNext">–</b><span>預計下一個空位</span></div></div>
+
+  <button class="pick wait" id="pick">
+    <span class="id" id="pickId">–</span>
+    <span class="t"><b id="pickTitle">讀取中</b><span id="pickSub"></span></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
+  <div class="aiRow"><button class="aiBtn" id="aiBtn" type="button">問 AI</button><div class="aiAns" id="aiAns" aria-live="polite"></div><form class="aiAsk" id="aiAsk"><input id="aiQ" maxlength="200" placeholder="什麼都能問，例如：哪格有雨棚？" enterkeyhint="send" autocomplete="off" aria-label="問 AI 問題"><button type="button" class="aiMic" id="aiMic" aria-label="語音提問"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="submit" id="aiAskBtn" aria-label="送出問題"><svg class="ic" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form><div class="aiChips" id="aiChips"></div></div>
+  <div class="navrow" id="navRow"><span class="nl">開車前往停車場</span><a id="navApple" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"/></svg>Apple 地圖</a><a id="navGoogle" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"/></svg>Google 地圖</a></div>
+
+  <div class="hold-card" id="hold" hidden>
+    <span class="id" id="holdId"></span>
+    <span class="t"><span>已為你保留，請在時間內停入</span>停進去後會自動記錄位置</span>
+    <span class="cd" id="holdCd" data-until=""></span>
+    <button class="ghost" id="holdCancel">取消</button>
+  </div>
+
+  <div class="mine-card" id="mine" hidden>
+    <span class="id" id="mineId"></span>
+    <span class="t"><span id="mineWhen"></span>你的車停在這裡</span>
+    <button class="ghost" id="mineClear">清除</button>
+  </div>
+
+  <h2 id="listH">所有車位<small id="listNote"></small></h2>
+  <div class="list" id="list"></div>
+
+  <div id="peakBox" hidden>
+    <h2>尖峰時段<small id="peakToday"></small></h2>
+    <div class="peak"><p id="peakSub"></p><div class="bars" id="peakBars"></div>
+      <div class="ax"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+      <div class="lg"><span><i></i>現在</span><span><i class="max"></i>最多車</span><em id="peakN"></em></div></div>
+  </div>
+
+  <div id="feedBox" hidden>
+    <h2>最近動態<small>即時更新</small></h2>
+    <div class="list feed" id="feed"></div>
+  </div>
+
+  <div class="scan showonly"><div style="display:flex;gap:inherit;align-items:center"><img src="qr.png" alt="使用者網頁 QR Code"><div><b>用手機掃描<br>即時查看空位</b><span>iPhone・iPad・Mac・Android 都能用<br>可保留車位、記錄停車位置</span></div></div></div>
+  <p class="hint" id="install" hidden>在 Safari 點「分享」→「加入主畫面」，就能像 App 一樣開啟</p>
+  </div></div>
+</main>
+
+<nav class="dock" aria-label="工具列"><div class="in">
+  <button id="bAlert" aria-pressed="false">
+    <svg class="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+    <span id="bAlertText">空位提醒</span>
+  </button>
+  <button id="bCar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17v2M18 17v2M4 13l2-6h12l2 6v4H4z"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>
+    <span id="bCarText">記錄車位</span>
+  </button>
+  <button id="bShare">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+    <span>分享空位</span>
+  </button>
+</div></nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sId">
+  <div class="grab"></div>
+  <div class="sh"><span class="id" id="sId"></span><span class="t"><b id="sState"></b><span id="sZone"></span></span></div>
+  <div class="kv"><span>最後變動</span><b class="num" id="sSince"></b></div>
+  <div class="kv" id="sEstRow" hidden><span id="sEstK">預計空出</span><b id="sEst"></b></div>
+  <div class="hist" id="sHist"></div>
+  <div class="acts">
+    <button class="btn line" id="sRoute">顯示路線</button>
+    <button class="btn main" id="sPark">我停在這格</button>
+  </div>
+  <div class="acts one"><button class="btn hold" id="sHold" hidden>保留 10 分鐘</button></div>
+  <p class="fine">時間從開啟頁面後開始記錄</p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<div class="sr" id="sr" aria-live="polite"></div>
+<div class="coach" id="coach" hidden role="dialog" aria-modal="true" aria-labelledby="cT">
+  <div class="hole" id="cHole"></div>
+  <div class="tip" id="cTip"><b id="cT"></b><span id="cD"></span>
+    <div class="cb"><button class="skip" id="cSkip">略過導覽</button><span class="n" id="cN"></span><button class="btn main" id="cNext">下一步</button></div>
+  </div>
+</div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyCj1Jeq_Q8mKaLRuCIZU9YocuNs7dMK2CM",
+  authDomain: "smart-parking-8df51.firebaseapp.com",
+  databaseURL: "https://smart-parking-8df51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "smart-parking-8df51",
+  storageBucket: "smart-parking-8df51.firebasestorage.app",
+  messagingSenderId: "982428772229",
+  appId: "1:982428772229:web:a13805dd604f65198d06ec"
+};
+const SDK = "https://www.gstatic.com/firebasejs/13.0.0/";
+
+const KEYS = ["indoor1","indoor2","indoor3","indoor4","outdoor1","outdoor2","outdoor3","outdoor4"];
+const CAR_COLORS = ["#C9D1D9","#3E4C59","#8C9AA8","#2F5D7C","#E5E7EB","#596A7A","#A3B1BE","#34495E"];
+const label = k => (k.startsWith("indoor") ? "I" : "O") + k.slice(-1);
+const isIn = k => k.startsWith("indoor");
+const $ = id => document.getElementById(id);
+const hm = t => new Date(t).toLocaleTimeString("zh-TW", {hour:"2-digit", minute:"2-digit", hour12:false});
+const hms = t => t ? new Date(t).toLocaleTimeString("zh-TW", {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false}) : "--:--:--";
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)) } catch { return null } },
+  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+};
+
+const Q = new URLSearchParams(location.search), SHOW = Q.has("show") || location.hash === "#show";
+const S = {
+  spots: Object.fromEntries(KEYS.map(k => [k, {occ:false, since:0}])),
+  disabled:{}, loaded:false, online:false, lastSync:0, open:null,
+  alert: !!store.get("sp_alert"), mine: store.get("sp_mycar"),
+  events:[], arrive:new Set(), leave:new Set(), localFeed:false, guide:null, sound:false,
+  log: Object.fromEntries(KEYS.map(k => [k, []])), hist: [], route:null, shownFree:null,
+  reserve:{}, writeHold:null, stays:[], avgStay:null, seen:{}
+};
+const CID = store.get("sp_cid") || (() => { const id = Math.random().toString(36).slice(2, 10); store.set("sp_cid", id); return id; })();
+const HOLD_MS = 10 * 60 * 1000;
+// 保留時間一律用伺服器時間（手機時鐘快了或慢了，保留才不會失敗或倒數不準）
+const srvNow = () => Date.now() + (S.skew || 0);
+// 感測器（ESP32）每 5 秒寫 device/lastSeen；超過 10 秒沒回報＝感測器離線（demo 模式不判斷）
+const DEV_TIMEOUT = 10000;
+const devOff = () => !Q.has("demo") && S.loaded && S.online && !S.failed && (!S.devSeen || srvNow() - S.devSeen > DEV_TIMEOUT);
+const heldBy = k => { const r = S.reserve[k]; return r && r.until > srvNow() ? r : null; };
+const myHold = () => KEYS.find(k => { const r = heldBy(k); return r && r.by === CID && !S.spots[k].occ && !off(k); });
+const isOpen = s => s === "free" || s === "myheld";
+const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+const lockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+function parseOcc(v){
+  if (v && typeof v === "object") v = v.occupied;
+  return v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true";
+}
+const off = k => !!S.disabled[k];
+const status = k => { if (!S.loaded) return "wait"; if (off(k)) return "off"; if (S.spots[k].occ) return "taken"; const r = heldBy(k); return r ? (r.by === CID ? "myheld" : "held") : "free"; };
+const word = {wait:"讀取中", off:"維修中", taken:"使用中", free:"空位", held:"保留中", myheld:"你保留的"};
+const since = t => {
+  const m = Math.max(0, Math.floor((Date.now() - t) / 60000));
+  return m < 1 ? "剛剛" : m < 60 ? `${m} 分鐘` : `${Math.floor(m/60)} 小時 ${m%60} 分`;
+};
+
+// 平均停車時間：從事件紀錄算出每台車停多久，用來估計何時會有空位
+const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
+function addStay(ms){ if (ms > 60000 && ms < 6 * 3600000) { S.stays.push(ms); S.stays = S.stays.slice(-200); S.avgStay = S.stays.length >= 3 ? median(S.stays) : S.avgStay; } }
+function staysFromEvents(list){
+  const start = {}, out = [];
+  list.slice().sort((a, b) => a.ts - b.ts).forEach(e => { const o = parseOcc(e.occ);
+    if (o) start[e.key] = e.ts; else if (start[e.key]) { out.push(e.ts - start[e.key]); delete start[e.key]; } });
+  return out.filter(ms => ms > 60000 && ms < 6 * 3600000);
+}
+const mins = ms => Math.max(1, Math.round(ms / 60000));
+// 哪一格最快空出：只用「看到停入時間」的格子
+function nextFree(){
+  if (!S.avgStay) return null;
+  const ts = KEYS.filter(k => status(k) === "taken" && S.seen[k]).map(k => S.spots[k].since + S.avgStay);
+  return ts.length ? Math.min(...ts) : null;
+}
+function applyParking(val){
+  const now = Date.now(), freed = [];
+  KEYS.forEach(k => {
+    const o = parseOcc(val ? val[k] : null), p = S.spots[k];
+    if (S.loaded && p.occ !== o) {
+      if (o) S.arrive.add(k); else if (!off(k)) { freed.push(k); S.leave.add(k); }
+      if (o) { const r = heldBy(k), mh = r && r.by === CID;
+        if (mh || k === S.guide) { S.mine = {key:k, ts:now}; store.set("sp_mycar", S.mine); if (mh && S.writeHold) S.writeHold(k, null);
+          if (k === S.guide) setTimeout(endRoute, 0); $("ask").hidden = true;
+          setTimeout(() => toast(`已停進 ${label(k)}，導引結束，位置記好了`), 300); } }
+      else if (S.mine && S.mine.key === k) { $("askT").textContent = `${label(k)} 的車開走了，是你嗎？`; $("ask").hidden = false; }
+      if (SHOW && S.sound) chime(!o);
+      $("sr").textContent = `${label(k)} ${o ? "有車停入" : "空出來了"}`;
+      if (!o && S.seen[k]) addStay(now - p.since);
+      S.seen[k] = true;
+      S.log[k].unshift({t:now, occ:o}); S.log[k] = S.log[k].slice(0, 6);
+      if (S.localFeed) S.events.unshift({ts:now, key:k, occ:o});
+    }
+    if (!S.loaded || p.occ !== o) p.since = now;
+    p.occ = o;
+  });
+  S.events = S.events.slice(0, SHOW ? 6 : 5);
+  if (S.loaded) S.moves = (S.moves || 0) + KEYS.filter(k => S.log[k][0] && S.log[k][0].t === now).length;
+  S.loaded = true; S.lastSync = now;
+  const usable = KEYS.filter(k => !off(k));
+  S.hist.push(usable.length ? usable.filter(k => S.spots[k].occ).length / usable.length : 0);
+  S.hist = S.hist.slice(-30);
+  if (S.alert && freed.length) notify(`${freed.map(label).join("、")} 空出來了`);
+  render();
+  S.arrive.clear(); S.leave.clear();
+  if (!S.coached && !SHOW && !store.get("sp_intro")) { S.coached = true; setTimeout(startCoach, 700); }
+}
+
+let tt;
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2800); }
+// 提示音（Web Audio，第一次按按鈕後才能播放）
+let AC = null;
+function unlockAudio(){ try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === "suspended") AC.resume(); } catch {} }
+function chime(up = true){
+  if (!AC) return; const t = AC.currentTime;
+  (up ? [880, 1320] : [660, 440]).forEach((f, i) => { const o = AC.createOscillator(), g = AC.createGain(), d = i * .13;
+    o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(.0001, t + d); g.gain.exponentialRampToValueAtTime(.16, t + d + .02); g.gain.exponentialRampToValueAtTime(.0001, t + d + .4);
+    o.connect(g); g.connect(AC.destination); o.start(t + d); o.stop(t + d + .45); });
+}
+function notify(msg){
+  toast(msg); chime(true);
+  if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+  if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+    const opt = {body: msg, tag: "sp-free"};
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(r => r.showNotification("雲端載重智慧車位偵測", opt)).catch(() => {});
+    else try { new Notification("雲端載重智慧車位偵測", opt) } catch {}
+  }
+}
+
+const car = k => { const c = CAR_COLORS[KEYS.indexOf(k)];
+  return `<svg class="car" viewBox="0 0 36 64" aria-hidden="true"><rect x="3" y="2" width="30" height="60" rx="9" fill="${c}"/><rect x="7" y="13" width="22" height="12" rx="4" fill="#0E1419" opacity=".55"/><rect x="8" y="27" width="20" height="16" rx="3" fill="#000" opacity=".12"/><rect x="7" y="45" width="22" height="9" rx="3" fill="#0E1419" opacity=".5"/><rect x="5" y="4" width="6" height="3" rx="1.5" fill="#FFF3C4"/><rect x="25" y="4" width="6" height="3" rx="1.5" fill="#FFF3C4"/></svg>`; };
+
+function render(){
+  const usable = KEYS.filter(k => !off(k));
+  const free = KEYS.filter(k => isOpen(status(k)));
+  const used = usable.length ? usable.filter(k => S.spots[k].occ).length / usable.length : 0;
+  const mineKey = S.mine && S.mine.key;
+
+  const dOff = devOff(); S.devWasOff = dOff;
+  $("live").classList.toggle("on", S.online && !S.failed && !dOff);
+  $("liveText").textContent = S.failed ? "無法連線" : dOff ? "感測器離線" : S.online ? "即時" : S.loaded ? "離線" : "連線中";
+  $("lot").classList.toggle("wait", !S.loaded);
+
+  const bay = k => { const s = status(k);
+    return `<button class="bay ${s}${S.arrive.has(k) ? " arrive" : ""}${mineKey === k ? " mine" : ""}" data-k="${k}" aria-label="${label(k)} ${word[s]}">
+      <span class="light"></span>
+      ${s === "taken" ? car(k) : (s === "held" || s === "myheld") ? `<span class="lock">${lockSvg}<span class="num" data-until="${heldBy(k).until}">${mmss(heldBy(k).until - srvNow())}</span></span>` : `<span class="pmark">${s === "off" ? "維修" : "P"}</span>`}
+      ${s !== "taken" && S.leave.has(k) ? `<span class="ghostcar ${isIn(k) ? "in" : "out"}">${car(k)}</span>` : ""}
+      <span class="ground">${label(k)}</span>
+      ${mineKey === k ? '<span class="tagme">我的車</span>' : ""}
+    </button>`; };
+  $("rowIn").innerHTML = KEYS.slice(0,4).map(bay).join("");
+  $("rowOut").innerHTML = KEYS.slice(4).map(bay).join("");
+  const zf = ks => ks.filter(k => isOpen(status(k))).length;
+  $("zIn").textContent = S.loaded ? `空 ${zf(KEYS.slice(0,4))}` : "–";
+  $("zOut").textContent = S.loaded ? `空 ${zf(KEYS.slice(4))}` : "–";
+
+  tween($("free"), S.loaded ? free.length : null);
+  $("offline").hidden = !(S.loaded && (!S.online || dOff));
+  $("offline").textContent = !S.online ? "連線中斷，畫面是最後收到的資料，恢復後會自動更新"
+    : S.devSeen ? `感測器離線（最後回報 ${hm(S.devSeen)}），車位狀態可能不是最新，恢復後會自動更新` : "感測器尚未連線，車位狀態可能不是最新";
+  const isFull = S.loaded && !free.length;
+  $("aisle").classList.toggle("full", isFull);
+  $("aisleText").textContent = isFull ? "目前已滿" : "車道 →";
+  drawSpark();
+  if (SHOW) { $("kStay").textContent = S.avgStay ? mins(S.avgStay) : "–"; $("kMoves").textContent = S.moves || 0;
+    const n = nextFree(); $("kNext").textContent = free.length ? "有空位" : n ? hm(Math.max(n, Date.now())) : "–"; $("kNext").style.fontSize = free.length ? "clamp(24px,2.2vw,36px)" : ""; }
+  $("usable").textContent = `共 ${usable.length} 格可停` + (usable.length < 8 ? `，${8 - usable.length} 格維修中` : "");
+  $("pct").textContent = S.loaded ? Math.round(used * 100) + "%" : "–";
+  $("meter").style.width = (S.loaded ? used * 100 : 0) + "%";
+  $("meter").style.background = used >= .75 ? "var(--taken)" : "var(--paint)";
+  stamp();
+
+  const held = myHold();
+  const pick = held || KEYS.find(k => status(k) === "free" && k !== mineKey) || KEYS.find(k => status(k) === "free");
+  const pe = $("pick");
+  pe.className = "pick " + (!S.loaded ? "wait" : pick ? "" : "full");
+  pe.dataset.pick = pick || "";
+  $("pickId").textContent = !S.loaded ? "–" : pick ? label(pick) : "滿";
+  $("pickTitle").textContent = !S.loaded ? (S.failed ? "無法連線" : "讀取中") : held ? "你保留的車位，點我看路線" : pick ? "建議停這格，點我看路線" : "目前沒有空位";
+  $("pickSub").textContent = !S.loaded ? (S.failed ? "請檢查網路後重新整理" : "") : pick ? (isIn(pick) ? "室內，有雨棚" : "室外，露天")
+    : (() => { const n = nextFree(), tip = S.alert ? "空出來會提醒你" : "點我開啟空位提醒";
+        if (n) return n > Date.now() ? `預計 ${hm(n)} 前後有空位・${tip}` : `隨時可能有車離開・${tip}`;
+        if (S.avgStay) return `平均每台停 ${mins(S.avgStay)} 分鐘・${tip}`;
+        return S.alert ? "有車位空出來會提醒你" : "開啟空位提醒，空出來就通知你"; })();
+
+  $("hold").hidden = !held;
+  if (!held) $("holdCd").dataset.until = "";
+  if (held) { $("holdId").textContent = label(held); $("holdCd").dataset.until = heldBy(held).until; $("holdCd").textContent = mmss(heldBy(held).until - srvNow()); }
+  $("mine").hidden = !S.mine;
+  if (S.mine) { $("mineId").textContent = label(mineKey); $("mineWhen").textContent = `${hm(S.mine.ts)} 停入・已停 ${since(S.mine.ts)}`; }
+
+  $("bAlert").classList.toggle("on", S.alert);
+  $("bAlert").setAttribute("aria-pressed", S.alert);
+  $("bAlertText").textContent = S.alert ? "提醒已開" : "空位提醒";
+  $("bCarText").textContent = S.mine ? "找我的車" : "記錄車位";
+
+  $("listNote").textContent = S.loaded ? `${free.length} 空・${usable.filter(k => S.spots[k].occ).length} 使用中` : "";
+  $("list").innerHTML = KEYS.map(k => { const s = status(k);
+    return `<button class="li ${s}" data-k="${k}"><span class="d"></span><span class="id">${label(k)}</span>
+      <span class="s">${word[s]}${(s === "held" || s === "myheld") ? ` <span class="cd" data-until="${heldBy(k).until}">${mmss(heldBy(k).until - srvNow())}</span>` : ""}${mineKey === k ? '<span class="me">我的車</span>' : ""}</span>
+      <span class="w">${isIn(k) ? "室內" : "室外"}${S.loaded && s !== "off" ? `・<span data-ago>${agoText()}</span>` : ""}</span></button>`; }).join("");
+
+  renderPeak();
+  $("feedBox").hidden = !S.events.length && !SHOW;
+  $("feed").innerHTML = S.events.map(e => { const o = parseOcc(e.occ);
+    return `<div class="li ${o ? "taken" : "free"}"><time>${hm(e.ts)}</time><span class="d"></span>
+      <span class="s">${e.label || label(e.key)} ${o ? "有車停入" : "車輛離開"}</span></div>`; }).join("") || (SHOW ? '<div class="empty">等待車位變化…</div>' : "");
+  const top = S.events[0], tk = top ? top.ts + (top.key || "") : "";
+  if (SHOW && tk && tk !== S.lastTop && $("feed").firstElementChild) $("feed").firstElementChild.classList.add("new");
+  S.lastTop = tk;
+
+  if (S.open) fillSheet();
+  if (S.route) requestAnimationFrame(drawRoute);
+}
+
+// 數字滾動
+function tween(el, to){
+  if (to == null) { el.textContent = "–"; S.shownFree = null; return; }
+  const from = S.shownFree == null ? to : S.shownFree; S.shownFree = to;
+  if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = to; return; }
+  const t0 = performance.now();
+  const step = t => { const p = Math.min(1, (t - t0) / 450); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+// 使用率走勢（本次開啟後）
+function drawSpark(){
+  const h = S.hist, sv = $("spark");
+  if (h.length < 2) { sv.innerHTML = ""; return; }
+  const pts = h.map((v, i) => [i / (h.length - 1) * 98 + 1, 24 - v * 22]);
+  const last = pts[pts.length - 1];
+  sv.innerHTML = `<polyline points="${pts.map(p => p.join(",")).join(" ")}" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="2.2"/>`;
+}
+// 尖峰時段：依 events/ 最新 300 筆的「有車停入」按小時統計（與 App 相同，只讀）
+function renderPeak(){
+  const ins = (S.evAll || []).filter(e => parseOcc(e.occ)), box = $("peakBox");
+  box.hidden = ins.length < 5 || SHOW; if (box.hidden) return;
+  const h = Array(24).fill(0); ins.forEach(e => h[new Date(e.ts).getHours()]++);
+  const max = Math.max(...h), peak = h.indexOf(max), nowH = new Date().getHours(), lv = h[nowH] / max;
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  $("peakToday").textContent = `今日進場 ${ins.filter(e => e.ts >= d0.getTime()).length} 次`;
+  $("peakSub").textContent = `最多車：${peak}～${peak + 1} 點・${lv >= .7 ? "現在通常很忙" : lv >= .35 ? "現在通常普通" : "現在通常比較空"}`;
+  $("peakBars").innerHTML = h.map((n, i) => `<i class="${i === nowH ? "now" : n === max ? "max" : ""}" style="height:${n ? n / max * 100 : 4}%" title="${i}～${i + 1} 點：進場 ${n} 次"></i>`).join("");
+  $("peakN").textContent = `依最近 ${ins.length} 次進場`;
+}
+// 從入口到車位的導引路線
+let routeTimer;
+function endRoute(){
+  clearTimeout(routeTimer); S.route = null; S.guide = null;
+  $("route").innerHTML = ""; $("g3").hidden = true; $("lot").classList.remove("focus"); $("endGuide").hidden = true; render();
+}
+function showRoute(k){
+  if (!k) return;
+  const toPark = isOpen(status(k)) && !(S.mine && S.mine.key === k);
+  S.route = k; S.guide = toPark && !SHOW ? k : null; clearTimeout(routeTimer);
+  routeTimer = setTimeout(endRoute, SHOW ? 8000 : toPark ? 180000 : 20000);
+  $("endGuide").hidden = SHOW;
+  $("endGuideT").textContent = toPark ? `導引到 ${label(k)}・停好會自動結束` : `帶你回到 ${label(k)}`;
+  render();
+  $("lot").scrollIntoView({behavior:"smooth", block:"center"});
+  if (navigator.vibrate) navigator.vibrate(15);
+}
+function drawRoute(){
+  const k = S.route, lot = $("lot"), bay = lot.querySelector(`.bay[data-k="${k}"]`);
+  if (!bay) return;
+  lot.querySelectorAll(".bay.target").forEach(b => b.classList.remove("target"));
+  bay.classList.add("target");
+  const at = el => { let x = 0, y = 0; const w = el.offsetWidth, h = el.offsetHeight; while (el && el !== lot) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; } return {left:x, top:y, right:x + w, bottom:y + h, width:w, height:h}; };
+  const A = at($("aisle")), G = at($("gate")), B = at(bay);
+  const sx = G.right + 4, sy = A.top + A.height / 2;
+  const bx = B.left + B.width / 2, by = isIn(k) ? B.bottom - 6 : B.top + 6;
+  const d = `M${sx},${sy} H${bx} V${by}`;
+  $("route").setAttribute("viewBox", `0 0 ${lot.offsetWidth} ${lot.offsetHeight}`);
+  $("route").innerHTML = `<path class="halo" d="${d}"/><path d="${d}"/><circle cx="${bx}" cy="${by}" r="5"/><circle class="ping" cx="${bx}" cy="${by}" r="8"/>`;
+  // 立體元素：光柱、浮空標記放在車位中央；光點沿路線跑
+  const cy = B.top + B.height / 2, g = $("g3");
+  g.hidden = false; $("lot").classList.add("focus");
+  for (const id of ["pillar", "pin", "rings"]) { $(id).style.left = bx + "px"; $(id).style.top = cy + "px"; }
+  $("pinT").textContent = label(k) + (S.mine && S.mine.key === k ? " 你的車" : "");
+  const key = `${k}|${sx}|${sy}|${bx}|${by}`;
+  if (g.dataset.key !== key) {
+    g.dataset.key = key;
+    const l1 = Math.abs(bx - sx), l2 = Math.abs(by - sy), L = l1 + l2 || 1;
+    const r = $("runner"); r.getAnimations().forEach(a => a.cancel());
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+      r.animate([{left:sx+"px", top:sy+"px", opacity:0}, {opacity:1, offset:.06}, {left:bx+"px", top:sy+"px", offset:Math.min(.85, Math.max(.12, l1/L*.9))}, {left:bx+"px", top:by+"px", opacity:1, offset:.9}, {left:bx+"px", top:by+"px", opacity:0}],
+        {duration:Math.max(1400, L * 6), iterations:Infinity, easing:"linear"});
+    else { r.style.left = bx + "px"; r.style.top = by + "px"; }
+  }
+}
+
+function fillSheet(){
+  const k = S.open, s = status(k);
+  $("sId").textContent = label(k);
+  $("sState").textContent = word[s];
+  $("sZone").textContent = isIn(k) ? "室內，有雨棚" : "室外，露天";
+  $("sSince").textContent = hms(S.spots[k].since);
+  const mine = S.mine && S.mine.key === k;
+  $("sPark").textContent = mine ? "清除記錄" : "我停在這格";
+  $("sPark").disabled = s === "off";
+  $("sPark").style.opacity = s === "off" ? .4 : 1;
+  const est = s === "taken" && S.avgStay;
+  $("sEstRow").hidden = !est;
+  if (est) {
+    if (S.seen[k]) { const t = S.spots[k].since + S.avgStay; $("sEstK").textContent = "預計空出"; $("sEst").textContent = t > Date.now() ? `約 ${hm(t)}（平均停 ${mins(S.avgStay)} 分）` : `隨時可能離開（已停 ${since(S.spots[k].since)}）`; }
+    else { $("sEstK").textContent = "平均停車"; $("sEst").textContent = `約 ${mins(S.avgStay)} 分鐘`; }
+  }
+  const lg = S.log[k];
+  $("sHist").innerHTML = lg.length
+    ? `<p>本次開啟後的變化</p>` + lg.map(e => `<div class="e"><time>${hms(e.t)}</time><i style="background:${e.occ ? "var(--taken)" : "var(--free)"}"></i>${e.occ ? "有車停入" : "車輛離開"}</div>`).join("")
+    : `<p>開啟頁面後這格還沒有變化</p>`;
+  $("sRoute").textContent = S.mine && S.mine.key === k ? "帶我回車上" : "顯示路線";
+  const hb = $("sHold");
+  hb.hidden = !(s === "myheld" || (s === "free" && !myHold()));
+  hb.textContent = s === "myheld" ? "取消保留" : "保留 10 分鐘";
+}
+function openSheet(k){ if (!k) return; S.open = k; fillSheet(); $("sheet").style.transform = ""; $("sheet").classList.add("show"); $("scrim").classList.add("show"); $("sPark").focus({preventScroll:true}); if (navigator.vibrate) navigator.vibrate(8); }
+function closeSheet(){ S.open = null; $("sheet").classList.remove("show"); $("scrim").classList.remove("show"); }
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-k]");
+  if (b && b.dataset.k) openSheet(b.dataset.k);
+});
+$("pick").onclick = () => { const k = $("pick").dataset.pick; if (k) showRoute(k); else if (S.loaded && !S.alert) $("bAlert").click(); };
+// 往下拖關閉
+(() => {
+  const sh = $("sheet"); let y0 = null, dy = 0;
+  sh.addEventListener("touchstart", e => { if (sh.scrollTop > 0) return; y0 = e.touches[0].clientY; dy = 0; sh.style.transition = "none"; }, {passive:true});
+  sh.addEventListener("touchmove", e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transform = `translateY(${dy}px)`; }, {passive:true});
+  sh.addEventListener("touchend", () => { if (y0 == null) return; sh.style.transition = ""; y0 = null; if (dy > 90) closeSheet(); sh.style.transform = ""; });
+})();
+$("scrim").onclick = closeSheet;
+$("sRoute").onclick = () => { const k = S.open; closeSheet(); showRoute(k); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+$("sPark").onclick = () => {
+  const k = S.open, same = S.mine && S.mine.key === k;
+  S.mine = same ? null : {key:k, ts:Date.now()}; store.set("sp_mycar", S.mine);
+  toast(same ? "已清除停車記錄" : `已記錄，你的車停在 ${label(k)}`);
+  closeSheet(); render();
+};
+$("sHold").onclick = () => {
+  const k = S.open, s = status(k);
+  if (!S.writeHold) return;
+  if (s === "myheld") { S.writeHold(k, null); toast("已取消保留"); }
+  else if (s === "free" && !myHold()) { S.writeHold(k, {until: srvNow() + HOLD_MS, by: CID}).then(ok => { if (ok !== false) toast(`已保留 ${label(k)} 10 分鐘`); }); closeSheet(); showRoute(k); return; }
+  closeSheet();
+};
+$("holdCancel").onclick = () => { const k = myHold(); if (k && S.writeHold) { S.writeHold(k, null); toast("已取消保留"); } };
+// 2D／3D 切換（預設 3D，記住選擇）
+const set3d = on => { $("lot").classList.toggle("d3", on); $("b3d").textContent = on ? "2D" : "3D"; $("b3d").setAttribute("aria-label", on ? "切換成平面" : "切換成立體"); store.set("sp_flat", on ? null : 1); if (S.route) requestAnimationFrame(drawRoute); };
+set3d(!store.get("sp_flat"));
+$("b3d").onclick = () => set3d(!$("lot").classList.contains("d3"));
+$("endGuide").onclick = endRoute;
+$("askYes").onclick = () => { S.mine = null; store.set("sp_mycar", null); $("ask").hidden = true; toast("已清除停車記錄，一路順風"); render(); };
+$("askNo").onclick = () => { $("ask").hidden = true; };
+// 互動式新手導覽
+const COACH = [
+  [() => $("lot"), "看燈號就知道", "● 綠色圓燈＝空位　■ 紅色方燈＝有車　◆ 黃色＝有人保留。畫面跟著感測器即時更新。"],
+  [() => document.querySelector(".bay.free") || $("lot"), "點任何一格", "看狀態、畫路線，空位還能保留 10 分鐘。"],
+  [() => $("pick"), "懶得挑？按這裡", "直接帶你到建議車位，停進去會自動結束導引並記住位置。"],
+  [() => $("b3d"), "2D／3D 切換", "3D 模式可以左右拖曳旋轉、雙指縮放，右上角可重設視角。"],
+  [() => document.querySelector(".dock .in"), "提醒、找車、分享", "開啟空位提醒，有車位空出來就通知你；停好後一鍵找回你的車。"]
+];
+let ci = 0;
+function placeCoach(){
+  const [get, t, d] = COACH[ci], el = get(); if (!el) return;
+  const r = el.getBoundingClientRect(), pad = 8, H = $("cHole"), T = $("cTip");
+  Object.assign(H.style, {left:r.left - pad + "px", top:r.top - pad + "px", width:r.width + pad * 2 + "px", height:r.height + pad * 2 + "px"});
+  $("cT").textContent = t; $("cD").textContent = d; $("cN").textContent = `${ci + 1}/${COACH.length}`;
+  $("cNext").textContent = ci === COACH.length - 1 ? "開始使用" : "下一步";
+  const th = T.offsetHeight, below = r.bottom + pad + 14, above = r.top - pad - 14 - th;
+  const top = below + th < innerHeight - 8 ? below : above > 8 ? above : Math.max(8, innerHeight - th - 16);
+  T.style.top = top + "px"; T.style.left = Math.min(innerWidth - T.offsetWidth - 16, Math.max(16, r.left + r.width / 2 - T.offsetWidth / 2)) + "px";
+}
+function coachStep(){
+  const el = COACH[ci][0](); if (el) el.scrollIntoView({block:"center", behavior:"smooth"});
+  setTimeout(placeCoach, 420);
+}
+function startCoach(){ ci = 0; $("coach").hidden = false; coachStep(); }
+function endCoach(){ $("coach").hidden = true; store.set("sp_intro", 1); }
+$("cNext").onclick = () => { if (++ci >= COACH.length) return endCoach(); coachStep(); };
+$("cSkip").onclick = endCoach;
+addEventListener("resize", () => { if (!$("coach").hidden) placeCoach(); });
+// 日夜場景：18:00～6:00 夜景（網址加 ?day / ?night 可強制）
+// 白天／夜晚：自動（依時間）→ 白天 → 夜晚，按按鈕循環切換並記住
+const MODE_NAMES = {auto:"自動", day:"白天", night:"夜晚"};
+const MODE_ICON = {
+  auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>',
+  day:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  night:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>'
+};
+let mode = Q.has("night") ? "night" : Q.has("day") ? "day" : (store.get("sp_mode") || "auto");
+function scene(){
+  const h = new Date().getHours(), night = mode === "night" || (mode === "auto" && (h >= 18 || h < 6));
+  $("lot").classList.toggle("night", night); $("lot").classList.toggle("day", !night);
+  $("sky").textContent = night ? "・夜間" : "・白天";
+  const root = document.documentElement;
+  if (mode === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", mode === "night" ? "dark" : "light");
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc && !SHOW) tc.content = mode === "night" ? "#11161B" : mode === "day" ? "#EDEFEC" : "#1F2933";
+  $("bMode").innerHTML = MODE_ICON[mode] + MODE_NAMES[mode];
+  $("bMode").setAttribute("aria-label", `目前：${MODE_NAMES[mode]}模式，點一下切換`);
+}
+$("bMode").onclick = () => {
+  mode = {auto:"day", day:"night", night:"auto"}[mode]; store.set("sp_mode", mode === "auto" ? null : mode); scene();
+  toast(mode === "auto" ? "自動：白天亮色、晚上 6 點後切夜景" : mode === "day" ? "白天模式" : "夜晚模式");
+};
+scene(); setInterval(scene, 5 * 60000);
+// 大字模式：記住選擇；沒選過時跟隨 iPhone「放大文字」設定
+(() => {
+  let big = store.get("sp_big");
+  if (big == null) { const t = document.createElement("span"); t.style.font = "-apple-system-body"; t.style.position = "absolute"; t.textContent = "a"; document.body.appendChild(t);
+    const fs = parseFloat(getComputedStyle(t).fontSize); t.remove(); big = t.style.font && fs >= 19; }
+  const set = v => { document.documentElement.classList.toggle("big", v); $("bBig").setAttribute("aria-pressed", v); if (S.route) requestAnimationFrame(drawRoute); };
+  set(!!big);
+  $("bBig").onclick = () => { const v = !document.documentElement.classList.contains("big"); store.set("sp_big", v); set(v); toast(v ? "已切換大字模式" : "已切換一般字體"); };
+})();
+// 展示模式音效
+$("bSound").onclick = () => { unlockAudio(); S.sound = !S.sound; $("bSound").setAttribute("aria-pressed", S.sound); $("bSound").textContent = S.sound ? "音效開" : "音效"; if (S.sound) chime(true); };
+// 3D 視角：拖曳旋轉、雙指／觸控板縮放
+(() => {
+  const st = $("stage"), lot = $("lot"), V = {rx:32, rz:0, sc:1}, P = new Map();
+  let base = null, moved = false, eat = false;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const apply = () => { lot.style.setProperty("--rx", V.rx + "deg"); lot.style.setProperty("--rz", V.rz + "deg"); lot.style.setProperty("--sc", V.sc);
+    $("resetView").hidden = !(lot.classList.contains("d3") && (Math.abs(V.rz) > 1 || Math.abs(V.rx - 32) > 1 || Math.abs(V.sc - 1) > .02)); };
+  const snap = () => { const a = [...P.values()]; base = {...V, a:a.map(p => ({...p})), d: a.length > 1 ? Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) : 0, ang: a.length > 1 ? Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x) : 0}; };
+  st.addEventListener("pointerdown", e => { if (!lot.classList.contains("d3")) return; P.set(e.pointerId, {x:e.clientX, y:e.clientY, t:e.pointerType}); moved = false; snap(); st.classList.add("grabbing"); });
+  st.addEventListener("pointermove", e => {
+    if (!P.has(e.pointerId) || !base) return; P.set(e.pointerId, {x:e.clientX, y:e.clientY, t:e.pointerType});
+    const a = [...P.values()];
+    if (a.length === 1 && base.a.length === 1) {
+      const dx = a[0].x - base.a[0].x, dy = a[0].y - base.a[0].y;
+      if (!moved && Math.hypot(dx, dy) < 6) return;
+      if (!moved && e.pointerType === "touch" && Math.abs(dy) > Math.abs(dx)) { P.clear(); base = null; return; }
+      moved = true; V.rz = clamp(base.rz + dx * .2, -20, 20); if (e.pointerType !== "touch") V.rx = clamp(base.rx - dy * .2, 12, 60);
+    } else if (a.length > 1 && base.a.length > 1) {
+      moved = true; const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y), ang = Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x);
+      V.sc = clamp(base.sc * d / (base.d || d), .7, 1.5); V.rz = clamp(base.rz + (ang - base.ang) * 57.3, -20, 20);
+    } else snap();
+    if (moved) { lot.classList.add("touched"); apply(); }
+  });
+  const up = e => { P.delete(e.pointerId); if (moved) eat = true; if (P.size) snap(); else { base = null; st.classList.remove("grabbing"); } };
+  st.addEventListener("pointerup", up); st.addEventListener("pointercancel", up);
+  st.addEventListener("click", e => { if (eat) { e.stopPropagation(); e.preventDefault(); eat = false; } }, true);
+  st.addEventListener("wheel", e => { if (!e.ctrlKey || !lot.classList.contains("d3")) return; e.preventDefault(); V.sc = clamp(V.sc * (1 - e.deltaY * .01), .7, 1.5); lot.classList.add("touched"); apply(); }, {passive:false});
+  $("resetView").onclick = () => { Object.assign(V, {rx:32, rz:0, sc:1}); lot.classList.remove("touched"); apply(); };
+  const sync = () => { st.classList.toggle("grab3", lot.classList.contains("d3")); apply(); };
+  new MutationObserver(sync).observe(lot, {attributes:true, attributeFilter:["class"]}); sync();
+})();
+// 展示模式：時鐘、螢幕常亮、全螢幕
+if (SHOW) {
+  document.body.classList.add("show");
+  { const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = "#11161B"; }
+  const tick = () => { $("clock").textContent = new Date().toLocaleTimeString("zh-TW", {hour:"2-digit", minute:"2-digit", hour12:false}); };
+  tick(); setInterval(tick, 10000);
+  let lock = null;
+  const wake = async () => { try { if ("wakeLock" in navigator && !document.hidden) lock = await navigator.wakeLock.request("screen"); } catch {} };
+  wake(); document.addEventListener("visibilitychange", wake);
+  const de = document.documentElement;
+  if (de.requestFullscreen) { $("fsBtn").hidden = false; $("fsBtn").onclick = () => document.fullscreenElement ? document.exitFullscreen() : de.requestFullscreen().catch(() => {}); }
+}
+let deferredInstall = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredInstall = e; $("installBtn").hidden = false; });
+$("installBtn").onclick = async () => { if (!deferredInstall) return; deferredInstall.prompt(); try { await deferredInstall.userChoice } catch {} deferredInstall = null; $("installBtn").hidden = true; };
+// 每格的「幾秒前確認」：跟著上方 S.lastSync，每 60 秒向 Firebase 確認後歸回 1 秒
+function agoText(){
+  if (!S.online) return "離線";
+  if (devOff()) return "感測器離線";
+  const s = Math.max(1, Math.floor((Date.now() - S.lastSync) / 1000));
+  return s < 60 ? `${s} 秒前確認` : `${Math.floor(s/60)} 分鐘前確認`;
+}
+// 每秒更新倒數與「幾秒前更新」
+function stamp(){
+  if (!S.loaded) { $("stamp").textContent = S.failed ? "無法連線" : "讀取中…"; return; }
+  if (!S.online) { $("stamp").textContent = `離線・最後更新 ${hm(S.lastSync)}`; return; }
+  if (devOff()) { $("stamp").textContent = S.devSeen ? `感測器離線・最後回報 ${hm(S.devSeen)}` : "感測器尚未連線"; document.querySelectorAll("[data-ago]").forEach(el => el.textContent = "感測器離線"); return; }
+  const s = Math.max(1, Math.floor((Date.now() - S.lastSync) / 1000));
+  $("stamp").textContent = s < 60 ? `${s} 秒前更新` : `${Math.floor(s/60)} 分鐘前更新・${hm(S.lastSync)}`;
+  const a = agoText(); document.querySelectorAll("[data-ago]").forEach(el => el.textContent = a);
+}
+let hadHold = false;
+setInterval(() => {
+  if (devOff() !== !!S.devWasOff) render();   // 感測器剛斷線或恢復 → 立刻更新畫面
+  stamp();
+  let expired = false;
+  document.querySelectorAll("[data-until]").forEach(el => { const left = +el.dataset.until - srvNow(); if (!el.dataset.until) return; if (left <= 0) expired = true; el.textContent = mmss(left); });
+  const h = myHold();
+  if (hadHold && !h && !S.mine) toast("保留時間到了，車位已釋出");
+  hadHold = !!h;
+  if (expired) render();
+}, 1000);
+$("mineClear").onclick = () => { S.mine = null; store.set("sp_mycar", null); render(); };
+$("bCar").onclick = () => {
+  if (S.mine) showRoute(S.mine.key);
+  else toast("點選你停的車位，再按「我停在這格」");
+};
+$("bAlert").onclick = async () => {
+  unlockAudio();
+  S.alert = !S.alert; store.set("sp_alert", S.alert || null);
+  if (S.alert && "Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission() } catch {} }
+  toast(S.alert ? "有車位空出來時會提醒你" : "已關閉空位提醒");
+  render();
+};
+$("bShare").onclick = async () => {
+  const free = KEYS.filter(k => status(k) === "free");
+  const text = free.length ? `雲端載重智慧車位偵測現在有 ${free.length} 個空位：${free.map(label).join("、")}` : "雲端載重智慧車位偵測目前已滿";
+  const url = location.origin + location.pathname;
+  try {
+    if (navigator.share) await navigator.share({title:"雲端載重智慧車位偵測", text, url});
+    else { await navigator.clipboard.writeText(`${text} ${url}`); toast("已複製，可以貼給朋友"); }
+  } catch (e) { if (e && e.name !== "AbortError") toast(text); }
+};
+setInterval(() => { if (S.loaded) render(); }, 30000);
+addEventListener("resize", () => { if (S.route) drawRoute(); });
+
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isMacSafari = !isIPad && /Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|Edg/.test(navigator.userAgent);
+if (!standalone) {
+  if (/iPhone/.test(navigator.userAgent) || isIPad) { $("install").textContent = "在 Safari 點「分享」→「加入主畫面」，就能像 App 一樣開啟"; $("install").hidden = false; }
+  else if (isMacSafari) { $("install").textContent = "Mac 的 Safari：選單「檔案」→「加入 Dock」，就能像 App 一樣開啟"; $("install").hidden = false; }
+}
+
+async function connect(){
+  try {
+    const { initializeApp } = await import(SDK + "firebase-app.js");
+    const { getDatabase, ref, onValue, query, orderByChild, limitToLast, set, remove, get } = await import(SDK + "firebase-database.js");
+    const fbApp = initializeApp(firebaseConfig); S.fbApp = fbApp;
+    // App Check（reCAPTCHA Enterprise）：2026/11/2 起 Firebase AI Logic 強制要求；載入失敗不影響車位資料
+    // Demo 裝置可在 localStorage 放偵錯符記（不寫在程式裡）：localStorage.appCheckDebugToken = "<符記>"
+    try { const t = localStorage.getItem("appCheckDebugToken"); if (t) self.FIREBASE_APPCHECK_DEBUG_TOKEN = t; } catch (e) {}
+    try { const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(SDK + "firebase-app-check.js");
+      initializeAppCheck(fbApp, { provider: new ReCaptchaEnterpriseProvider("6LdUZv4tAAAAAD22iprZ1eIdtkgLrvGzBBfOIijp"), isTokenAutoRefreshEnabled: true }); } catch (e) { console.warn(e); }
+    const db = getDatabase(fbApp);
+    let lastPark = "";
+    onValue(ref(db, "parking"), s => { S.failed = false; lastPark = JSON.stringify(s.val()); applyParking(s.val()); }, e => { S.failed = true; render(); console.error(e); });
+    // 每 60 秒主動向 Firebase 確認一次，確認成功就把「幾秒前更新」歸零（資料沒變就不重算，免得使用率曲線多出重複點）
+    const resync = () => get(ref(db, "parking"))
+      .then(s => { const j = JSON.stringify(s.val()); if (j !== lastPark) { lastPark = j; applyParking(s.val()); } S.failed = false; S.lastSync = Date.now(); stamp(); })
+      .catch(() => {});
+    setInterval(() => { if (S.online) resync(); }, 60000);
+    // AI 共用快取：同一個車位狀態，所有訪客共用一份回答
+    import(SDK + "firebase-ai.js").catch(() => {});   // 先在背景載入，按「問 AI」時不用再下載
+    S.aiGet = h => get(ref(db, `aiCache/user/${h}`)).then(s => s.val(), () => null);
+    S.aiSet = (h, v) => set(ref(db, `aiCache/user/${h}`), v).catch(() => {});
+    onValue(ref(db, "admin/disabled"), s => { S.disabled = s.val() || {}; render(); });
+    onValue(ref(db, "reserve"), s => { S.reserve = s.val() || {}; render(); });
+    // 取消保留＝寫入已過期的保留（by 不變），規則才能確認是本人取消；過期後任何人都能覆寫
+    S.writeHold = (k, v) => set(ref(db, `reserve/${k}`), v || {until: 0, by: CID}).then(() => true, () => { toast(v ? "保留失敗，這格可能剛被別人保留或已有車" : "取消失敗，請檢查網路"); return false; });
+    onValue(ref(db, ".info/serverTimeOffset"), s => { S.skew = s.val() || 0; });
+    onValue(ref(db, "device/lastSeen"), s => { const v = s.val(); S.devSeen = typeof v === "number" ? v : null; render(); }, () => { S.devSeen = null; });
+    onValue(ref(db, ".info/connected"), s => { const was = S.online; S.online = s.val() === true; render(); if (S.online && !was && S.loaded) resync(); });
+    // 依 ts 取最新 300 筆（不指定排序會照 key 字母排，拿到的是 outdoor 幾格的舊事件）
+    onValue(query(ref(db, "events"), orderByChild("ts"), limitToLast(300)), s => {
+      const v = s.val();
+      if (v) { const all = Object.values(v).filter(e => e && e.key && e.ts);
+        S.evAll = all; S.lastEv = {}; all.forEach(e => { if (!S.lastEv[e.key] || e.ts > S.lastEv[e.key].ts) S.lastEv[e.key] = e; });   // 給 AI 算已空／已停多久
+        S.localFeed = false; S.events = all.sort((a,b) => b.ts - a.ts).slice(0, SHOW ? 6 : 5);
+        const st = staysFromEvents(all); if (st.length >= 3) { S.stays = st.slice(-200); S.avgStay = median(S.stays); } }
+      else S.localFeed = true;
+      render();
+    }, () => { S.localFeed = true; });
+  } catch (e) { S.failed = true; render(); console.error(e); }
+}
+function demo(){
+  const val = {indoor1:"1",indoor2:"0",indoor3:"0",indoor4:"1",outdoor1:"0",outdoor2:"1",outdoor3:"0",outdoor4:"0"};
+  S.online = true; S.disabled = {outdoor4:true}; S.localFeed = true;
+  S.reserve = {outdoor3: {until: Date.now() + 6 * 60 * 1000, by: "someone"}};
+  S.stays = [38, 52, 41, 47, 35, 60, 44].map(m => m * 60000); S.avgStay = median(S.stays);
+  S.writeHold = (k, v) => { if (v) S.reserve[k] = v; else delete S.reserve[k]; render(); return Promise.resolve(true); };
+  applyParking(val);
+  setInterval(() => { const k = KEYS[Math.floor(Math.random()*7)]; val[k] = val[k] === "1" ? "0" : "1"; applyParking({...val}); }, 4000);
+}
+// ── AI 助理共用元件（使用者網頁、管理網頁相同）─────────────────────────
+// 免費額度每個模型分開算：依序嘗試，前一個失敗（額度用完／逾時）就換下一個
+const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
+const AI_TTL = 6 * 3600000;   // 共用快取 6 小時內有效
+const AI_VARIANTS = 3;        // 每個狀態最多存 3 種說法，每次按輪流換
+const AI_FAIL = {text: "暫時無法回答", cached: true};
+const fnv = str => { let h = 0x811c9dc5; for (const c of str) { h ^= c.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
+// 時間分段，資料文字才不會每分鐘都變（共用快取才有用）
+const aiDur = ms => ms < 600000 ? "不到 10 分鐘" : ms < 1800000 ? "10～30 分鐘" : ms < 3600000 ? "半小時～1 小時" : ms < 3 * 3600000 ? "1～3 小時" : "3 小時以上";
+const aiPeriod = () => { const h = new Date().getHours(); return h < 5 ? "深夜" : h < 11 ? "早上" : h < 14 ? "中午" : h < 18 ? "下午" : h < 23 ? "晚上" : "深夜"; };
+const aiPickVariant = c => { const o = [...Array(AI_VARIANTS).keys()].filter(i => i !== c.n); return o[Math.floor(Math.random() * o.length)]; };
+// 串流產生：onText 收到目前累積的文字；換模型前會送空字串讓畫面回到思考中
+// 逾時含 App Check（reCAPTCHA）驗證時間，手機慢網路時第一個模型給 25 秒；三個都很快失敗時再試一輪
+async function aiGenerate(ai, getGenerativeModel, prompt, onText){
+  const t0 = Date.now();
+  for (let round = 0; round < 2; round++) {
+    if (round) { if (Date.now() - t0 > 20000) break; await new Promise(r => setTimeout(r, 1000)); }
+    for (const [i, m] of AI_MODELS.entries()) {
+      const ms = i ? 15000 : 25000; let live = true, acc = "";
+      try {
+        const run = (async () => {
+          const r = await getGenerativeModel(ai, { model: m }, { timeout: ms }).generateContentStream(prompt);
+          for await (const ch of r.stream) { if (!live) return ""; acc += ch.text(); if (acc.trim()) onText(acc.trim()); }
+          return acc.trim();
+        })();
+        const text = await Promise.race([run, new Promise((_, no) => setTimeout(() => no(new Error("串流逾時")), ms + 15000))]);
+        if (text) return text;
+      } catch (e) { console.warn(m, e); } finally { live = false; }
+      if (acc) onText("");
+    }
+  }
+  return "";
+}
+// 對話框：思考中跳動圓點；回答（串流或逐字）出現，車位名稱變成小標籤；可唸出回答
+// 問題列：多輪對話時顯示「延續前 N 句」與「↺ 新對話」
+function aiQLine(a, q, hist){
+  if (!q) return; const d = document.createElement("div"); d.className = "aiQ"; d.textContent = `你問：${q}`;
+  if (hist && hist.n) { const r = document.createElement("button"); r.type = "button"; r.className = "aiReset"; r.textContent = `延續前 ${hist.n} 句・↺ 新對話`; r.onclick = hist.reset; d.appendChild(r); }
+  a.appendChild(d);
+}
+function aiThinking(a, q, {hist, notice} = {}){
+  a.classList.add("think"); a.classList.toggle("notice", !!notice); a.textContent = ""; a._tw = (a._tw || 0) + 1; aiQLine(a, q, hist);
+  const d = document.createElement("div"); d.innerHTML = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>思考中…'; a.appendChild(d);
+}
+const aiSay = t => t.replace(/indoor([1-4])/g, "室內$1號").replace(/outdoor([1-4])/g, "室外$1號");
+function aiShow(a, text, {q, onSpot, typing, streaming, hist, notice} = {}){
+  a.classList.remove("think"); a.classList.toggle("notice", !!notice); a.textContent = ""; const tw = a._tw = (a._tw || 0) + 1; aiQLine(a, q, hist);
+  const body = document.createElement("div"); body.className = "aiBody" + (streaming ? " live" : ""); a.appendChild(body);
+  const nodes = [];
+  for (const s of text.split(/(indoor[1-4]|outdoor[1-4])/)) { if (!s) continue;
+    if (/^(indoor|outdoor)[1-4]$/.test(s)) { const c = document.createElement(onSpot ? "button" : "span"); c.className = "aiSpot"; c.textContent = s;
+      if (onSpot) { c.type = "button"; c.onclick = () => onSpot(s); } nodes.push([c, null]); }
+    else nodes.push([document.createTextNode(""), s]); }
+  const done = () => { if (streaming || !("speechSynthesis" in window) || text === AI_FAIL.text) return;
+    const sp = document.createElement("button"); sp.type = "button"; sp.className = "aiSpeak"; sp.setAttribute("aria-label", "唸出回答"); sp.innerHTML = ICON.speaker;
+    sp.onclick = () => { if (speechSynthesis.speaking) return speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(aiSay(text)); u.lang = "zh-TW"; u.rate = 1.05; speechSynthesis.speak(u); };
+    a.appendChild(sp); };
+  if (!typing || matchMedia("(prefers-reduced-motion: reduce)").matches) { nodes.forEach(([n, s]) => { if (s !== null) n.textContent = s; body.appendChild(n); }); return done(); }
+  let i = 0, j = 0;
+  const step = () => { if (tw !== a._tw) return; if (i >= nodes.length) return done(); const [n, s] = nodes[i];
+    if (j === 0) body.appendChild(n);
+    if (s === null || j >= s.length) { i++; j = 0; return step(); }
+    j = Math.min(s.length, j + 2); n.textContent = s.slice(0, j); setTimeout(step, 22); };
+  step();
+}
+// 快捷問題：點一下直接問
+function aiChips(box, qs, ask){ qs.forEach(q => { const b = document.createElement("button"); b.type = "button"; b.textContent = q; b.onclick = () => ask(q); box.appendChild(b); }); }
+// 語音提問：瀏覽器支援語音辨識才顯示麥克風（Chrome、Safari）；講完自動送出
+function aiVoice(btn, input, send){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return btn.remove();
+  let rec = null;
+  btn.onclick = () => {
+    if (rec) return rec.stop();
+    rec = new SR(); rec.lang = "zh-TW"; rec.interimResults = true; input.value = "";
+    rec.onresult = e => { input.value = [...e.results].map(r => r[0].transcript).join("").slice(0, 200); };
+    rec.onend = () => { btn.classList.remove("rec"); rec = null; if (input.value.trim()) send(); };
+    rec.onerror = e => console.warn("語音辨識", e.error);
+    try { rec.start(); btn.classList.add("rec"); } catch (e) { rec = null; console.warn(e); }
+  };
+}
+// 進場最多的時段（依事件紀錄的「有車」事件，按小時統計）
+const aiBusyHour = list => { const h = Array(24).fill(0); list.forEach(t => h[new Date(t).getHours()]++); const m = Math.max(...h);
+  return m ? `${h.indexOf(m)}～${h.indexOf(m) + 1} 點（進場 ${m} 次）` : "沒有紀錄"; };
+// 問 AI：只把目前車位資料傳給 Gemini（金鑰由 Firebase AI Logic 管理）
+// 給 AI 的資料：時段、每格狀態與已空／已停多久（依事件紀錄）、空位數、平均停車時間
+function aiData(){
+  const w = {free:"空位", taken:"有車", held:"他人保留中", myheld:"你保留的", off:"維修中"}, now = srvNow();
+  const spot = k => { const st = status(k), e = S.lastEv && S.lastEv[k];
+    const dur = e && (st === "free" || st === "taken") && parseOcc(e.occ) === (st === "taken") ? `，${st === "taken" ? "已停" : "已空"}${aiDur(now - e.ts)}` : "";
+    return `${k}(${isIn(k) ? "室內有雨棚" : "室外露天"}):${w[st] || "未知"}${dur}`; };
+  const free = KEYS.filter(k => status(k) === "free").length;
+  let d = `現在${aiPeriod()}；${KEYS.map(spot).join(", ")}；空位 ${free} 格`;
+  if (S.avgStay) d += `；平均每台停約 ${Math.max(10, Math.round(S.avgStay / 600000) * 10)} 分鐘`;
+  if (!free) { const n = nextFree(); if (n && n > Date.now()) d += `；預計 ${hm(n)} 前後有空位`; }
+  return d + aiFlow();
+}
+// 近 7 天這個時段與下個時段的進出次數（讓 AI 判斷接下來容易有空位還是會變多車；App 算法與文字相同）
+function aiFlow(){
+  const t0 = srvNow() - 7 * 86400000, h = new Date().getHours(), c = [0, 0, 0, 0];
+  (S.evAll || []).forEach(e => { if (e.ts < t0) return; const eh = new Date(e.ts).getHours(), i = eh === h ? 0 : eh === (h + 1) % 24 ? 2 : -1;
+    if (i >= 0) c[i + (parseOcc(e.occ) ? 0 : 1)]++; });
+  return c.some(n => n) ? `；近 7 天這時段（${h}～${h + 1} 點）進場 ${c[0]} 次、離場 ${c[1]} 次，下個時段進場 ${c[2]} 次、離場 ${c[3]} 次` : "";
+}
+// AI 失敗時的本機推薦（與 App 相同）：你保留的優先，再來有雨棚、空最久的；不放進快取
+function aiLocal(){
+  const now = srvNow(), mine = KEYS.find(k => status(k) === "myheld");
+  if (mine) return `${mine} 已為你保留，直接停這格就好。`;
+  const free = KEYS.filter(k => status(k) === "free");
+  if (!free.length) { const n = nextFree(); return `目前全滿${n && n > Date.now() ? `，預計 ${hm(n)} 前後有空位` : ""}。`; }
+  const idle = k => { const e = S.lastEv && S.lastEv[k]; return e && !parseOcc(e.occ) ? now - e.ts : 0; };
+  const k = free.sort((a, b) => (isIn(b) - isIn(a)) || idle(b) - idle(a))[0];
+  return `推薦 ${k}：${isIn(k) ? "室內有雨棚" : "室外露天"}${idle(k) ? `，已空${aiDur(idle(k))}` : ""}；目前空位 ${free.length} 格。`;
+}
+// 自己問問題時才附上的統計（不放進共用快取，App 的快取格式不受影響）
+const aiStats = () => S.evAll && S.evAll.length ? `；最近紀錄中最多車進場的時段：${aiBusyHour(S.evAll.filter(e => parseOcc(e.occ)).map(e => e.ts))}` : "";
+const aiCache = {data: "", n: -1, texts: [], qa: {}};   // 車位狀態沒變就沿用，省額度
+// 多輪對話：記住最近 3 組自己打的問答，下一題 AI 才看得懂「那」「它」指什麼
+const aiHist = [];
+const aiHistText = () => aiHist.map(h => `使用者：${h.q}\n助理：${h.a}`).join("\n");
+// 共用快取：同一份資料所有訪客共用一份回答
+async function aiShared(key, data, gen){
+  const h = fnv(key), c = S.aiGet ? await S.aiGet(h) : null;
+  if (c && c.data === data && typeof c.text === "string" && srvNow() - c.ts < AI_TTL) return {text: c.text, cached: true};
+  const text = await gen(); if (text && S.aiSet) S.aiSet(h, {data, text, ts: srvNow()});
+  return text ? {text, cached: false} : AI_FAIL;
+}
+// mode：沒給＝推薦車位；{q}＝自己打的問題；{notice}＝狀態改變時主動提醒
+async function askAi(onText, {q, notice} = {}){
+  try {
+    // 手機網路慢時資料可能還在讀取（慢速 3G 約 30 秒），先等最多 30 秒
+    for (let i = 0; i < 60 && !(S.fbApp && S.loaded); i++) await new Promise(r => setTimeout(r, 500));
+    if (!S.fbApp || !S.loaded) return AI_FAIL;
+    const data = aiData();
+    if (data !== aiCache.data) Object.assign(aiCache, {data, n: -1, texts: [], qa: {}});
+    const gen = async prompt => {
+      const { getAI, getGenerativeModel, GoogleAIBackend } = await import(SDK + "firebase-ai.js");
+      return aiGenerate(getAI(S.fbApp, { backend: new GoogleAIBackend(), useLimitedUseAppCheckTokens: true }), getGenerativeModel, prompt, onText);
+    };
+    const RULE = "只根據以下資料，不要編造；資料中沒有的資訊就直接說資料中沒有。";
+    if (notice) return await aiShared(`notice#${notice}#${data}`, `${notice}｜${data}`,
+      () => gen(`你是停車場助理。剛剛發生：${notice}。${RULE}用一句繁體中文主動提醒使用者（有空位就推薦一格並說理由，全滿就說已全滿）。資料：${data}`));
+    if (q) {
+      const hist = aiHistText(), key = `${hist}\n${q}`;
+      if (aiCache.qa[key]) return {text: aiCache.qa[key], cached: true};
+      const text = await gen(`你是停車場助理，也能回答一般問題。跟這個停車場有關的問題，只根據下方資料回答，不要編造，資料中沒有就直接說資料中沒有；其他任何問題（生活、知識、聊天等）都可以用你的一般知識回答，但不要編造停車場的即時狀況。用繁體中文簡短回答（最多三句）。`
+        + (hist ? `先前對話（只用來理解代名詞，車位狀態以下方資料為準）：\n${hist}\n` : "") + `資料：${data}${aiStats()}\n使用者問題：「${q}」`);
+      if (!text) return AI_FAIL;
+      aiCache.qa[key] = text; return {text, cached: false};
+    }
+    const n = aiPickVariant(aiCache);
+    if (aiCache.texts[n]) { aiCache.n = n; return {text: aiCache.texts[n], cached: true}; }
+    const vary = ["", "請換一種說法；若有多個同樣合適的空位，可以推薦其他格。", "請用不同的句型，理由可以從遮雨、空了多久、剩餘空位數或這時段的車流擇一說明。"][n];
+    const prompt = `你是停車場助理。只根據以下資料，用一句繁體中文推薦最適合停的車位並說明理由，不要編造。只能推薦「空位」或「你保留的」；若全滿，說已全滿，並依預計空出時間或這時段的離場次數說大概多久會有空位。空位只剩一兩格且這時段進場比離場多時，提醒要盡快。${vary}資料：${data}`;
+    // 「你保留的」只屬於這位使用者，不放進共用快取
+    const r = data.includes("你保留的") ? await gen(prompt).then(t => t ? {text: t, cached: false} : AI_FAIL) : await aiShared(`${data}#${n}`, data, () => gen(prompt));
+    if (r !== AI_FAIL) { aiCache.n = n; aiCache.texts[n] = r.text; }
+    return r;
+  } catch (e) { console.warn(e); return AI_FAIL; }
+}
+let aiBusy = false;
+async function runAi(mode = {}){
+  if (aiBusy) return; aiBusy = true;
+  const a = $("aiAns"), btns = [$("aiBtn"), $("aiAskBtn")], q = mode.q, notice = mode.notice;
+  const hist = q && aiHist.length ? {n: aiHist.length, reset: () => { aiHist.length = 0; toast("已開始新對話"); a.querySelector(".aiReset")?.remove(); }} : null;
+  btns.forEach(b => b.disabled = true); aiThinking(a, q, {hist, notice});
+  a.classList.remove("local");
+  const r = await askAi(t => t ? aiShow(a, t, {q, hist, notice, streaming: true}) : aiThinking(a, q, {hist, notice}), mode);
+  if (q && r !== AI_FAIL) { aiHist.push({q, a: r.text}); if (aiHist.length > 3) aiHist.shift(); }
+  // AI 失敗（額度用完、網路慢）就改用本機規則推薦，畫面不會只剩「暫時無法回答」
+  const local = r === AI_FAIL && S.loaded, text = local ? (q ? "AI 暫時無法回答，先給你目前的建議：" : "") + aiLocal() : r.text;
+  aiShow(a, text, {q, hist, notice, onSpot: k => showRoute(k), typing: r.cached}); a.classList.toggle("local", local);
+  btns.forEach(b => b.disabled = false); aiBusy = false;
+}
+$("aiBtn").onclick = () => runAi();
+$("aiAsk").onsubmit = e => { e.preventDefault(); const q = $("aiQ").value.trim(); if (!q || aiBusy) return; $("aiQ").value = ""; $("aiQ").blur(); runAi({q}); };
+aiChips($("aiChips"), ["哪格有雨棚？", "多久會有空位？", "哪格空最久？", "通常幾點最多車？"], q => { if (!aiBusy) runAi({q}); });
+aiVoice($("aiMic"), $("aiQ"), () => $("aiAsk").requestSubmit());
+// 主動提醒：只在「剛全滿／從全滿空出車位／只剩最後一格」時說話；每台最多每分鐘一次；展示模式不觸發
+if (!Q.has("demo")) { let prev = null, at = 0;
+  setInterval(() => { if (!S.loaded) return; const f = KEYS.filter(k => status(k) === "free").length;
+    const ev = prev === null || f === prev ? "" : f === 0 ? "停車場剛剛全滿了" : prev === 0 ? "剛剛有車位空出來了" : f === 1 ? "只剩最後一個空位了" : "";
+    prev = f;
+    if (ev && !aiBusy && !document.hidden && document.activeElement !== $("aiQ") && Date.now() - at > 60000) { at = Date.now(); runAi({notice: ev}); }
+  }, 3000); }
+
+Q.has("demo") ? demo() : connect();
+// 展示模式：沒人操作時，輪流示範導引到空位
+if (SHOW) { let idle = 0, i = 0;
+  addEventListener("pointerdown", () => idle = 0);
+  setInterval(() => { if (++idle < 3 || S.open || !S.loaded) return; const f = KEYS.filter(k => status(k) === "free"); if (f.length) showRoute(f[i++ % f.length]); }, 4000); }
+// 主畫面捷徑「找我的車」
+if (Q.has("car")) { const go = () => { if (!S.loaded) return setTimeout(go, 300); S.mine ? showRoute(S.mine.key) : toast("還沒記錄車位：點你停的格子，再按「我停在這格」"); }; go(); }
+render();
+
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");
+// 導航到停車場：Apple 地圖／Google 地圖（目的地改這裡）
+const NAV_DEST = "臺中市北區三民路三段129號 國立臺中科技大學";
+(() => {
+  const d = encodeURIComponent(NAV_DEST);
+  const a = document.getElementById("navApple"), g = document.getElementById("navGoogle");
+  a.href = `https://maps.apple.com/?daddr=${d}&dirflg=d`;
+  g.href = `https://www.google.com/maps/dir/?api=1&destination=${d}&travelmode=driving`;
+  if (!/iPhone|iPad|Macintosh/.test(navigator.userAgent)) g.parentNode.insertBefore(g, a);
+})();
+</script>
+</body>
+</html>
