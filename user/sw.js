@@ -1,5 +1,5 @@
 // 只快取本頁的外殼檔案；車位資料一律即時從 Firebase 取得
-const CACHE = "sp-user-v28";
+const CACHE = "sp-user-v29";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./qr.png"];
 
 self.addEventListener("install", e => {

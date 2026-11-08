@@ -1,11 +1,26 @@
-# 雲端載重智慧車位偵測 — 網頁端
+# Smart Parking Spot Detection — Web
 
-D16 資工五乙專題。Firebase Hosting 上的三個網頁：
+Web front ends for a university capstone project (Team D16, NUTC Computer Science & Information Engineering).
+Each parking spot uses a light sensor plus a weight sensor; two ESP32 boards push the status to Firebase Realtime Database, and these pages show it live.
 
-| 路徑 | 平台 | 說明 |
+| Path | Page | What it does |
 |---|---|---|
-| `/user/` | 使用者網頁 | 免登入看即時空位、推薦車位、路線、保留、找我的車 |
-| `/` | 管理者網頁 | 需業主授權＋信箱驗證；使用率、平面圖、維修、事件紀錄 |
-| `/owner/` | 業主頁面 | 用信箱授權管理者、自訂權限與到期日 |
+| `/user/` | User site | No sign-in. Live free spots, suggested spot, route guidance, 10-minute hold, find my car |
+| `/` | Admin site | Needs owner approval and a verified email. Usage, floor plan, maintenance, event log, CSV export |
+| `/owner/` | Owner page | Grant managers access by email, with custom permissions and an expiry date |
 
-部署：`firebase deploy --only hosting`
+All three pages have a **中文 / EN** switch in the bottom-left corner (`i18n.js`). The choice is remembered per browser, and the AI assistant answers in the selected language.
+
+## Tech
+
+- Firebase Hosting, Realtime Database, Authentication, App Check
+- Gemini via Firebase AI Logic
+- Plain HTML, CSS and JavaScript (no build step)
+
+## Deploy
+
+```
+firebase deploy --only hosting
+```
+
+`database.rules.json` is kept out of this public repository because it contains the owner's email.
